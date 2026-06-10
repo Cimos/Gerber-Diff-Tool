@@ -37,6 +37,7 @@ dev = ["pytest>=8.0"]
 
 [project.scripts]
 gdiff = "gerberdiff.cli:main"
+gdiff-gui = "gerberdiff.gui:main"
 
 [project.urls]
 # TODO: replace OWNER with the GitHub account this lands under before publishing.

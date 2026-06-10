@@ -3,8 +3,7 @@
     gdiff OLD NEW -o report.html [options]
 
 OLD and NEW are either two folders of Gerber/drill files, or two schematic PDF
-files; the mode is auto-detected. The renderer is imported lazily so ``--help``
-and argument parsing work even without the rendering dependencies.
+files; the mode is auto-detected (see :mod:`gerberdiff.runner`).
 """
 
 from __future__ import annotations
@@ -15,9 +14,8 @@ import sys
 from pathlib import Path
 
 from . import __version__
-from .diff import diff_layer
-from .models import DiffResult, LayerDiff, PairStatus
-from .pairing import pair_layers
+from .models import DiffResult, PairStatus
+from .runner import run_diff, write_report
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -57,37 +55,6 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _is_pdf(path: Path) -> bool:
-    return path.is_file() and path.suffix.lower() == ".pdf"
-
-
-def _run_gerber(args: argparse.Namespace) -> DiffResult:
-    from .render import render_pair_aligned  # lazy: pure-logic tests don't need it
-
-    pairs = pair_layers(args.old, args.new)
-    layers: list[LayerDiff] = []
-    for pair in pairs:
-        try:
-            image_a, image_b = render_pair_aligned(pair.path_a, pair.path_b, dpmm=args.dpmm)
-            layers.append(diff_layer(pair, image_a, image_b, threshold=args.threshold))
-        except Exception as exc:  # noqa: BLE001 - one bad layer must not abort the run
-            layers.append(LayerDiff(pair=pair, error=f"{type(exc).__name__}: {exc}"))
-    return DiffResult(
-        dir_a=args.old, dir_b=args.new,
-        resolution=f"{args.dpmm} dpmm", subject="layer", layers=layers,
-    )
-
-
-def _run_pdf(args: argparse.Namespace) -> DiffResult:
-    from .pdfdiff import diff_pdfs  # lazy
-
-    layers = diff_pdfs(args.old, args.new, dpi=args.dpi, threshold=args.threshold)
-    return DiffResult(
-        dir_a=args.old, dir_b=args.new,
-        resolution=f"{args.dpi} dpi", subject="page", layers=layers,
-    )
-
-
 def _print_summary(result: DiffResult) -> None:
     for layer in result.layers:
         if layer.error:
@@ -106,16 +73,12 @@ def _print_summary(result: DiffResult) -> None:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
-    if _is_pdf(args.old) and _is_pdf(args.new):
-        result = _run_pdf(args)
-    elif args.old.is_dir() and args.new.is_dir():
-        result = _run_gerber(args)
-    else:
-        print(
-            "error: OLD and NEW must both be folders of Gerber files, "
-            "or both be .pdf files",
-            file=sys.stderr,
+    try:
+        result = run_diff(
+            args.old, args.new, dpmm=args.dpmm, dpi=args.dpi, threshold=args.threshold
         )
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
         return 2
 
     if not result.layers:
@@ -123,10 +86,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     generated = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
-    from .report import render_html
-
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(render_html(result, generated_at=generated), encoding="utf-8")
+    write_report(result, args.output, generated_at=generated)
 
     print(f"Compared {len(result.layers)} {result.subject}s ({len(result.changed_layers)} changed):")
     _print_summary(result)

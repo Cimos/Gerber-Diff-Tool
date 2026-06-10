@@ -1,0 +1,56 @@
+"""Tests for the shared runner (used by both CLI and GUI) and GUI importability."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from gerberdiff.runner import is_pdf, run_diff
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def test_run_diff_gerber_mode():
+    pytest.importorskip("pygerber")
+    result = run_diff(FIXTURES / "revA", FIXTURES / "revB", dpmm=20)
+    assert result.subject == "layer"
+    assert result.resolution == "20 dpmm"
+    assert result.any_changes
+
+
+def test_run_diff_pdf_mode(tmp_path: Path):
+    pytest.importorskip("pypdfium2")
+    from PIL import Image, ImageDraw
+
+    def make(path: Path, extra: bool) -> None:
+        image = Image.new("1", (300, 200), 1)
+        draw = ImageDraw.Draw(image)
+        draw.rectangle([40, 40, 200, 140], outline=0, width=4)
+        if extra:
+            draw.line([210, 40, 270, 120], fill=0, width=5)
+        image.save(str(path))
+
+    a = tmp_path / "a.pdf"
+    b = tmp_path / "b.pdf"
+    make(a, extra=False)
+    make(b, extra=True)
+    result = run_diff(a, b, dpi=100)
+    assert result.subject == "page"
+    assert result.resolution == "100 dpi"
+    assert result.any_changes
+
+
+def test_run_diff_rejects_mismatched_inputs(tmp_path: Path):
+    folder = tmp_path / "d"
+    folder.mkdir()
+    pdf = tmp_path / "x.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+    assert is_pdf(pdf)
+    with pytest.raises(ValueError):
+        run_diff(folder, pdf)
+
+
+def test_gui_module_imports():
+    # Import-only: must not create a Tk root (CI is headless).
+    import gerberdiff.gui  # noqa: F401
