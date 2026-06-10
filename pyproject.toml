@@ -27,6 +27,7 @@ classifiers = [
 dependencies = [
     "pygerber>=2.4",   # native Pillow raster + get_info() bbox; no cairo, no system libs
     "gerbonara>=1.6",  # LayerStack auto-detects layer types for rename-tolerant pairing
+    "pypdfium2>=4.0",  # PDFium PDF page rendering for schematic diff; pip wheel, no system libs
     "pillow>=10.0",
     "numpy>=1.24",
 ]

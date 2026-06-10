@@ -3,13 +3,13 @@
 **Free, offline, scriptable visual diff for PCB Gerber files — and schematic PDFs.**
 
 `gerber-diff` compares two revisions of a board's fabrication data and shows you
-exactly what changed: per layer, with a red/green overlay, in a self-contained
-HTML report you can attach to a review or archive. It runs entirely on your
-machine — nothing is uploaded — and the same engine drives a command line you can
-wire into CI.
+exactly what changed: per layer (or per schematic page), with a red/green
+overlay, in a self-contained HTML report you can attach to a review or archive.
+It runs entirely on your machine — nothing is uploaded — and the same engine
+drives a command line you can wire into CI.
 
-> Status: **early alpha (v0.1).** The Gerber diff path is the first milestone.
-> Schematic-PDF diff and a desktop GUI are on the roadmap below.
+> Status: **early alpha (v0.1).** Gerber **and** schematic-PDF diff both work.
+> A desktop GUI and a reusable GitHub Action are on the roadmap below.
 
 ## Why
 
@@ -22,24 +22,26 @@ cross-platform, scriptable package. That's the gap this fills.
 
 ## Features (v0.1)
 
-- Compare two folders of Gerber/drill files.
+- Compare two folders of Gerber/drill files **or** two schematic PDFs — the mode
+  is auto-detected.
 - Automatic layer detection and pairing via
   [`gerbonara`](https://gitlab.com/gerbolyze/gerbonara)'s `LayerStack`: layers
   pair by *identity* (top copper, bottom mask, …), so pairing survives a board
   being renamed between revisions — with a filename fallback for anything it
   doesn't recognise (drills, unusual layers).
 - Native raster rendering via [`pygerber`](https://github.com/Argmaster/pygerber)
+  (Gerber) and [`pypdfium2`](https://github.com/pypdfium2-team/pypdfium2) (PDF)
   — **no cairo / no system libraries**, so it behaves the same on Windows,
   macOS and Linux.
 - Red = removed, green = added, grey = unchanged colour overlay.
-- Self-contained single-file HTML report with embedded images.
+- Self-contained single-file HTML report with embedded images, light/dark theme.
 - `--fail-on-diff` exit code for use in CI / GitHub Actions.
 
 ### Roadmap
 
-- Schematic / PDF diff (render pages → pixel diff → highlight).
 - Desktop GUI (synchronised pan/zoom, side-by-side + overlay).
 - Reusable GitHub Action that comments diffs on pull requests.
+- Structural (net-level) schematic diff, beyond pixel diff.
 
 ## Install
 
@@ -60,10 +62,13 @@ gdiff --help
 ## Usage
 
 ```bash
-# Compare two revisions and write a report
+# Compare two Gerber revisions (folders) and write a report
 gdiff path/to/rev-old path/to/rev-new -o diff-report.html
 
-# Higher resolution (dots per millimetre), and fail the command if anything changed
+# Compare two schematic PDFs (auto-detected), page by page
+gdiff rev-old.pdf rev-new.pdf -o schematic-diff.html --dpi 200
+
+# Higher resolution, and fail the command if anything changed (for CI)
 gdiff rev-old rev-new -o report.html --dpmm 40 --fail-on-diff
 ```
 
@@ -73,14 +78,18 @@ required.
 ## How it works
 
 ```
-two folders ─▶ pairing ────▶ render each layer ─▶ align ─▶ pixel diff ─▶ HTML report
-              (gerbonara)    (pygerber → PNG)    (by bbox)  (numpy XOR)
+gerbers ─▶ pairing ────▶ render each layer ─▶ align ─▶ pixel diff ─▶ HTML report
+          (gerbonara)    (pygerber → PNG)    (by bbox)  (numpy XOR)
+
+PDFs ────▶ pages ───────▶ render each page ──▶ invert ─▶ pixel diff ─▶ HTML report
+          (by index)     (pypdfium2 → PNG)              (numpy XOR)
 ```
 
 The diff *engine* (`gerberdiff.pairing`, `.diff`, `.report`) has no GUI and no
 renderer baked in — it is plain functions over dataclasses, which is what keeps
-it testable and scriptable. The renderer lives behind `gerberdiff.render` so it
-can be swapped without touching the diff logic.
+it testable and scriptable. Renderers live behind `gerberdiff.render` (Gerber)
+and `gerberdiff.pdfdiff` (PDF) so they can be swapped without touching the diff
+logic.
 
 ## Development
 

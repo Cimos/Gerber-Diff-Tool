@@ -58,11 +58,12 @@ class LayerDiff:
 
 @dataclass
 class DiffResult:
-    """Top-level result for a whole two-folder comparison."""
+    """Top-level result for a whole comparison (gerber folders or PDFs)."""
 
     dir_a: Path
     dir_b: Path
-    dpmm: float
+    resolution: str = ""    # e.g. "20 dpmm" (gerber) or "150 dpi" (pdf)
+    subject: str = "layer"  # "layer" for gerbers, "page" for PDFs
     layers: list[LayerDiff] = field(default_factory=list)
 
     @property

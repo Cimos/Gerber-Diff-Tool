@@ -1,8 +1,8 @@
 """Render a self-contained HTML diff report (all images embedded as base64).
 
 The output is a single file with no external assets, a colour legend, a summary
-table, and one card per layer. It supports light and dark themes: it follows the
-OS preference by default and offers a manual toggle.
+table, and one card per layer (or PDF page). It supports light and dark themes:
+it follows the OS preference by default and offers a manual toggle.
 """
 
 from __future__ import annotations
@@ -85,9 +85,9 @@ def _b64_png(data: bytes) -> str:
 def _status_tag(layer: LayerDiff) -> str:
     status = layer.pair.status
     if status is PairStatus.ADDED:
-        return '<span class="tag added">added layer</span>'
+        return '<span class="tag added">added</span>'
     if status is PairStatus.REMOVED:
-        return '<span class="tag removed">removed layer</span>'
+        return '<span class="tag removed">removed</span>'
     if layer.error:
         return '<span class="tag changed">error</span>'
     if layer.changed:
@@ -112,7 +112,7 @@ def _summary_row(layer: LayerDiff) -> str:
 
 def _layer_card(layer: LayerDiff) -> str:
     if layer.error:
-        body = f'<p class="err">Could not render this layer: {_esc(layer.error)}</p>'
+        body = f'<p class="err">Could not render this item: {_esc(layer.error)}</p>'
     elif layer.overlay_png is not None:
         body = f'<img alt="diff overlay" src="data:image/png;base64,{_b64_png(layer.overlay_png)}">'
     else:
@@ -131,19 +131,21 @@ def render_html(
     result: DiffResult, *, title: str = "Gerber Diff Report", generated_at: str | None = None
 ) -> str:
     changed = result.changed_layers
+    subject = result.subject
     summary = (
-        f"{len(changed)} of {len(result.layers)} layers differ"
+        f"{len(changed)} of {len(result.layers)} {subject}s differ"
         if result.layers
-        else "no layers found"
+        else f"no {subject}s found"
     )
     rows = "\n".join(_summary_row(layer) for layer in result.layers)
     cards = "\n".join(
         _layer_card(layer) for layer in result.layers if layer.changed or layer.error
     )
     if not cards:
-        cards = '<p class="sub">No differences to show — every matched layer is identical.</p>'
+        cards = f'<p class="sub">No differences to show — every matched {subject} is identical.</p>'
 
     meta_when = f" &middot; generated {_esc(generated_at)}" if generated_at else ""
+    resolution = f" &middot; {_esc(result.resolution)}" if result.resolution else ""
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -156,7 +158,7 @@ def render_html(
 <body>
 <header>
   <h1>{_esc(title)}</h1>
-  <span class="meta">{_esc(summary)} &middot; {result.dpmm:g} dpmm{meta_when}</span>
+  <span class="meta">{_esc(summary)}{resolution}{meta_when}</span>
   <button id="theme-toggle">Toggle theme</button>
 </header>
 <main>
@@ -168,7 +170,7 @@ def render_html(
     <span><span class="swatch" style="background:#6e6e6e"></span>unchanged</span>
   </div>
   <table>
-    <thead><tr><th>Layer</th><th>File</th><th>Status</th>
+    <thead><tr><th>{_esc(subject.title())}</th><th>Source</th><th>Status</th>
       <th>Added px</th><th>Removed px</th><th>Changed area</th></tr></thead>
     <tbody>
 {rows}
