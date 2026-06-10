@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Virtual environments / uv
+.venv/
+venv/
+.python-version
+uv.lock.bak
+
+# Tool output (generated diff reports)
+/out/
+*.report.html
+report_assets/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
