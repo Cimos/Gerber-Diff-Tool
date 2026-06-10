@@ -1,14 +1,21 @@
 """Match Gerber/drill files between two revision folders and label layer types.
 
-v1 pairs by normalised file name (lower-cased), which is correct for the common
-case of re-exporting the same project. Pairing across *renamed* exports (a
-different project prefix on each side) is a planned enhancement — see the
-roadmap in README.md.
+Two strategies, best-first:
+
+1. **Semantic (gerbonara).** ``gerbonara.layers.LayerStack`` auto-detects each
+   graphic layer's ``(side, function)`` — e.g. ``('top', 'copper')`` — across
+   many EDA naming conventions. Pairing on that identity survives a board being
+   renamed between revisions. gerbonara is finicky (it raises on minimal or
+   unusual file sets), so this is attempted defensively.
+2. **Filename (catch-all / fallback).** Files gerbonara doesn't recognise — drill
+   files, unusual layers, or *everything* if gerbonara can't map the folder at
+   all — are paired by normalised file name. This always works.
 """
 
 from __future__ import annotations
 
 import re
+import warnings
 from pathlib import Path
 
 from .models import LayerPair, PairStatus
@@ -61,28 +68,80 @@ def iter_gerber_files(folder: Path) -> list[Path]:
     )
 
 
+def _status(a: Path | None, b: Path | None) -> PairStatus:
+    if a and b:
+        return PairStatus.MATCHED
+    return PairStatus.ADDED if b else PairStatus.REMOVED
+
+
+def _gerbonara_graphic_map(folder: Path) -> dict[str, Path]:
+    """Map ``{"top copper": path, ...}`` via gerbonara, or ``{}`` if it can't.
+
+    Only graphic layers are taken from gerbonara; drills and anything it ignores
+    are left for the filename pass. Any failure (gerbonara not installed, an
+    unmappable folder) degrades silently to an empty map.
+    """
+    try:
+        from gerbonara.layers import LayerStack
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            stack = LayerStack.open(str(folder))
+    except Exception:
+        return {}
+
+    mapping: dict[str, Path] = {}
+    for (side, function), layer in getattr(stack, "graphic_layers", {}).items():
+        path = getattr(layer, "original_path", None)
+        if path:
+            mapping[f"{side} {function}"] = Path(path)
+    return mapping
+
+
 def pair_layers(dir_a: Path, dir_b: Path) -> list[LayerPair]:
-    """Pair files in *dir_a* (old) and *dir_b* (new) by normalised file name."""
+    """Pair files in *dir_a* (old) and *dir_b* (new).
+
+    Layers gerbonara recognises are paired on semantic identity (rename-tolerant);
+    everything else is paired by normalised file name.
+    """
     files_a = {p.name.lower(): p for p in iter_gerber_files(dir_a)}
     files_b = {p.name.lower(): p for p in iter_gerber_files(dir_b)}
 
+    semantic_a = _gerbonara_graphic_map(dir_a)
+    semantic_b = _gerbonara_graphic_map(dir_b)
+
     pairs: list[LayerPair] = []
-    for key in sorted(set(files_a) | set(files_b)):
-        a = files_a.get(key)
-        b = files_b.get(key)
-        if a and b:
-            status = PairStatus.MATCHED
-        elif b:
-            status = PairStatus.ADDED
-        else:
-            status = PairStatus.REMOVED
+
+    # 1. Semantic pairs (rename-tolerant) for layers gerbonara recognised.
+    for key in sorted(set(semantic_a) | set(semantic_b)):
+        a = semantic_a.get(key)
+        b = semantic_b.get(key)
         pairs.append(
             LayerPair(
                 key=key,
-                layer_type=classify_layer(key),
-                status=status,
+                layer_type=key.title(),
+                status=_status(a, b),
                 path_a=a,
                 path_b=b,
             )
         )
+
+    # 2. Filename pairs for everything gerbonara didn't account for.
+    mapped_a = {p.name.lower() for p in semantic_a.values()}
+    mapped_b = {p.name.lower() for p in semantic_b.values()}
+    leftover_a = {n: p for n, p in files_a.items() if n not in mapped_a}
+    leftover_b = {n: p for n, p in files_b.items() if n not in mapped_b}
+    for name in sorted(set(leftover_a) | set(leftover_b)):
+        a = leftover_a.get(name)
+        b = leftover_b.get(name)
+        pairs.append(
+            LayerPair(
+                key=name,
+                layer_type=classify_layer(name),
+                status=_status(a, b),
+                path_a=a,
+                path_b=b,
+            )
+        )
+
     return pairs

@@ -23,7 +23,11 @@ cross-platform, scriptable package. That's the gap this fills.
 ## Features (v0.1)
 
 - Compare two folders of Gerber/drill files.
-- Automatic layer pairing by file name, with friendly layer-type labels.
+- Automatic layer detection and pairing via
+  [`gerbonara`](https://gitlab.com/gerbolyze/gerbonara)'s `LayerStack`: layers
+  pair by *identity* (top copper, bottom mask, …), so pairing survives a board
+  being renamed between revisions — with a filename fallback for anything it
+  doesn't recognise (drills, unusual layers).
 - Native raster rendering via [`pygerber`](https://github.com/Argmaster/pygerber)
   — **no cairo / no system libraries**, so it behaves the same on Windows,
   macOS and Linux.
@@ -34,7 +38,6 @@ cross-platform, scriptable package. That's the gap this fills.
 ### Roadmap
 
 - Schematic / PDF diff (render pages → pixel diff → highlight).
-- Layer pairing across renamed exports (match by detected layer type).
 - Desktop GUI (synchronised pan/zoom, side-by-side + overlay).
 - Reusable GitHub Action that comments diffs on pull requests.
 
@@ -70,8 +73,8 @@ required.
 ## How it works
 
 ```
-two folders ─▶ pairing ─▶ render each layer ─▶ align ─▶ pixel diff ─▶ HTML report
-              (by name)   (pygerber → PNG)   (by bbox)  (numpy XOR)
+two folders ─▶ pairing ────▶ render each layer ─▶ align ─▶ pixel diff ─▶ HTML report
+              (gerbonara)    (pygerber → PNG)    (by bbox)  (numpy XOR)
 ```
 
 The diff *engine* (`gerberdiff.pairing`, `.diff`, `.report`) has no GUI and no
