@@ -1,0 +1,12 @@
+# Normalise line endings: store LF in the repo, check out LF everywhere.
+# Keeps Gerber fixtures byte-stable so renders/tests match across OSes.
+* text=auto eol=lf
+
+*.gbr  text eol=lf
+*.drl  text eol=lf
+*.py   text eol=lf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.pdf binary
