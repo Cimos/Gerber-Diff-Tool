@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="gerber-diff logo">
+  <title>gerber-diff</title>
+  <desc>Two offset rounded layers — blue (revision A) over orange (revision B) — overlapping, with copper vias. The overlap reads as 'present in both'.</desc>
+  <rect x="8" y="11" width="31" height="31" rx="7" fill="#2f6fe0"/>
+  <rect x="25" y="22" width="31" height="31" rx="7" fill="#e07b2d"/>
+  <path d="M25 22h14v20H25z" fill="#5b6473"/>
+  <circle cx="43.5" cy="33.5" r="2.5" fill="#fdf3e9"/>
+  <circle cx="50" cy="44" r="2.5" fill="#fdf3e9"/>
+  <circle cx="38.5" cy="48" r="2.5" fill="#fdf3e9"/>
+</svg>

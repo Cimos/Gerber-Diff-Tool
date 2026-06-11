@@ -36,9 +36,10 @@ _CSS = """
 body { margin:0; background:var(--bg); color:var(--fg);
   font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
 .wrap { max-width:1120px; margin:0 auto; padding:30px 28px 64px; }
-header { display:flex; align-items:baseline; gap:10px; }
+header { display:flex; align-items:center; gap:9px; }
 header h1 { font-size:20px; font-weight:700; margin:0; letter-spacing:-.01em; }
-header .word { color:var(--muted); font-size:14px; }
+header .word { color:var(--muted); font-size:14px; align-self:flex-end; padding-bottom:2px; }
+header .logo { display:block; flex:none; }
 button#theme-toggle { margin-left:auto; background:var(--panel); color:var(--fg);
   border:1px solid var(--border); border-radius:8px; padding:7px 12px; cursor:pointer; font-size:13px; box-shadow:var(--shadow); }
 button#theme-toggle:hover { border-color:var(--accent); }
@@ -390,6 +391,7 @@ def render_html(
 <body>
 <div class="wrap">
   <header>
+    <svg class="logo" viewBox="0 0 64 64" width="26" height="26" aria-hidden="true"><rect x="8" y="11" width="31" height="31" rx="7" fill="#2f6fe0"/><rect x="25" y="22" width="31" height="31" rx="7" fill="#e07b2d"/><path d="M25 22h14v20H25z" fill="#5b6473"/><circle cx="43.5" cy="33.5" r="2.5" fill="#fdf3e9"/><circle cx="50" cy="44" r="2.5" fill="#fdf3e9"/><circle cx="38.5" cy="48" r="2.5" fill="#fdf3e9"/></svg>
     <h1>gerber-diff</h1><span class="word">report</span>
     <button id="theme-toggle" aria-pressed="false">Toggle theme</button>
   </header>

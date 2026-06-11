@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="branding/icon-128.png" width="84" alt="gerber-diff logo">
+</p>
+
 # gerber-diff
 
 **Free, offline, scriptable visual diff for PCB Gerber files — and schematic PDFs.**
@@ -175,6 +179,12 @@ uv run ruff check . && uv run ruff format --check .
 
 CI runs ruff (lint + format) and the test suite with a coverage gate on
 Ubuntu / Windows / macOS × Python 3.12 / 3.13 (see `.github/workflows/ci.yml`).
+
+## Support
+
+gerber-diff is free and MIT-licensed. If it saved you from a bad board respin
+and you'd like to say thanks, you can
+[buy me a coffee](https://www.buymeacoffee.com/cimos).
 
 ## License
 
