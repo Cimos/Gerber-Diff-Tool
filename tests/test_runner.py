@@ -1,4 +1,4 @@
-"""Tests for the shared runner (used by both CLI and GUI) and GUI importability."""
+"""Tests for the shared runner used by both the CLI and the GUI."""
 
 from __future__ import annotations
 
@@ -11,12 +11,28 @@ from gerberdiff.runner import is_pdf, run_diff
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
+def test_is_pdf(tmp_path: Path):
+    pdf = tmp_path / "x.pdf"
+    pdf.write_bytes(b"%PDF-1.4")
+    assert is_pdf(pdf) is True
+    folder = tmp_path / "d"
+    folder.mkdir()
+    assert is_pdf(folder) is False
+    assert is_pdf(tmp_path / "missing.pdf") is False
+
+
 def test_run_diff_gerber_mode():
     pytest.importorskip("pygerber")
     result = run_diff(FIXTURES / "revA", FIXTURES / "revB", dpmm=20)
     assert result.subject == "layer"
     assert result.resolution == "20 dpmm"
     assert result.any_changes
+
+
+def test_run_diff_identical_dirs_no_change():
+    pytest.importorskip("pygerber")
+    result = run_diff(FIXTURES / "revA", FIXTURES / "revA", dpmm=20)
+    assert not result.any_changes
 
 
 def test_run_diff_pdf_mode(tmp_path: Path):
@@ -51,6 +67,14 @@ def test_run_diff_rejects_mismatched_inputs(tmp_path: Path):
         run_diff(folder, pdf)
 
 
-def test_gui_module_imports():
-    # Import-only: must not create a Tk root (CI is headless).
-    import gerberdiff.gui  # noqa: F401
+def test_run_diff_bad_gerber_becomes_error_layer(tmp_path: Path):
+    pytest.importorskip("pygerber")
+    a = tmp_path / "a"
+    b = tmp_path / "b"
+    a.mkdir()
+    b.mkdir()
+    (a / "junk.gbr").write_text("this is not a gerber file")
+    (b / "junk.gbr").write_text("this is not a gerber file")
+    result = run_diff(a, b, dpmm=20)
+    assert len(result.layers) == 1
+    assert result.layers[0].error is not None

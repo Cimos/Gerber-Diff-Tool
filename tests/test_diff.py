@@ -7,7 +7,16 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 
-from gerberdiff.diff import diff_layer
+from gerberdiff.diff import (
+    COLOR_ADDED,
+    COLOR_COMMON,
+    COLOR_REMOVED,
+    diff_layer,
+    diff_masks,
+    overlay_image,
+    png_bytes,
+    presence_mask,
+)
 from gerberdiff.models import LayerPair, PairStatus
 
 
@@ -18,13 +27,9 @@ def _image(white_pixels: set[tuple[int, int]], size: int = 10) -> Image.Image:
     return Image.fromarray(arr, mode="L")
 
 
-def _pair() -> LayerPair:
+def _pair(status: PairStatus = PairStatus.MATCHED, key: str = "x-f_cu.gbr") -> LayerPair:
     return LayerPair(
-        key="x-f_cu.gbr",
-        layer_type="Top Copper",
-        status=PairStatus.MATCHED,
-        path_a=Path("a"),
-        path_b=Path("b"),
+        key=key, layer_type="Top Copper", status=status, path_a=Path("a"), path_b=Path("b")
     )
 
 
@@ -38,8 +43,8 @@ def test_identical_images_have_no_change():
 
 
 def test_added_and_removed_pixels_counted():
-    image_a = _image({(1, 1), (5, 5)})          # (5,5) only in A -> removed
-    image_b = _image({(1, 1), (8, 8)})          # (8,8) only in B -> added
+    image_a = _image({(1, 1), (5, 5)})  # (5,5) only in A -> removed
+    image_b = _image({(1, 1), (8, 8)})  # (8,8) only in B -> added
     result = diff_layer(_pair(), image_a, image_b)
     assert result.removed_pixels == 1
     assert result.added_pixels == 1
@@ -59,4 +64,52 @@ def test_added_layer_with_missing_side():
     result = diff_layer(pair, None, image_b)
     assert result.added_pixels == 2
     assert result.removed_pixels == 0
-    assert result.changed is True  # ADDED status is always a change
+    assert result.changed is True
+
+
+def test_diff_layer_both_sides_none_is_error():
+    result = diff_layer(_pair(), None, None)
+    assert result.error is not None
+    assert "no image" in result.error.lower()
+
+
+def test_threshold_controls_ink_detection():
+    image_a = _image(set())
+    arr = np.zeros((10, 10), dtype=np.uint8)
+    arr[0, 0] = 50  # dim pixel
+    image_b = Image.fromarray(arr, mode="L")
+    assert diff_layer(_pair(), image_a, image_b, threshold=10).added_pixels == 1
+    assert diff_layer(_pair(), image_a, image_b, threshold=200).added_pixels == 0
+
+
+def test_presence_mask_luminance_threshold():
+    img = Image.fromarray(np.array([[0, 50, 255]], dtype=np.uint8), mode="L")
+    assert presence_mask(img, threshold=10).tolist() == [[False, True, True]]
+    assert presence_mask(img, threshold=200).tolist() == [[False, False, True]]
+
+
+def test_presence_mask_rgba_black_is_absent():
+    rgba = Image.fromarray(np.zeros((1, 3, 4), dtype=np.uint8), mode="RGBA")
+    assert presence_mask(rgba, threshold=10).tolist() == [[False, False, False]]
+
+
+def test_diff_masks_pads_to_common_size():
+    a = np.array([[True, False]])  # 1x2
+    b = np.array([[True], [True]])  # 2x1
+    added, removed, common = diff_masks(a, b)
+    assert added.shape == removed.shape == common.shape == (2, 2)
+    assert bool(common[0, 0]) is True
+
+
+def test_overlay_image_uses_expected_colours():
+    added = np.array([[True, False, False]])
+    removed = np.array([[False, True, False]])
+    common = np.array([[False, False, True]])
+    px = np.asarray(overlay_image(added, removed, common))
+    assert tuple(px[0, 0]) == COLOR_ADDED
+    assert tuple(px[0, 1]) == COLOR_REMOVED
+    assert tuple(px[0, 2]) == COLOR_COMMON
+
+
+def test_png_bytes_has_png_signature():
+    assert png_bytes(Image.new("RGB", (2, 2)))[:8] == b"\x89PNG\r\n\x1a\n"

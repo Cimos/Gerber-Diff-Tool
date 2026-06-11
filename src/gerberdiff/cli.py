@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import logging
 import sys
+import warnings
 from pathlib import Path
 
 from . import __version__
@@ -24,32 +26,60 @@ def build_parser() -> argparse.ArgumentParser:
         description="Free, offline visual diff for PCB Gerber files and schematic PDFs.",
     )
     parser.add_argument(
-        "old", type=Path, metavar="OLD",
+        "old",
+        type=Path,
+        metavar="OLD",
         help="revision A: a folder of Gerber/drill files, or a schematic .pdf",
     )
     parser.add_argument(
-        "new", type=Path, metavar="NEW",
+        "new",
+        type=Path,
+        metavar="NEW",
         help="revision B: a folder of Gerber/drill files, or a schematic .pdf",
     )
     parser.add_argument(
-        "-o", "--output", type=Path, default=Path("gerber-diff-report.html"),
+        "-o",
+        "--output",
+        type=Path,
+        default=Path("gerber-diff-report.html"),
         help="path to write the HTML report (default: %(default)s)",
     )
     parser.add_argument(
-        "--dpmm", type=int, default=20,
+        "--json",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        dest="json_path",
+        help="also write a machine-readable JSON summary to PATH (for CI/automation)",
+    )
+    parser.add_argument(
+        "--dpmm",
+        type=int,
+        default=20,
         help="gerber render resolution, dots per millimetre (default: %(default)s)",
     )
     parser.add_argument(
-        "--dpi", type=int, default=150,
+        "--dpi",
+        type=int,
+        default=150,
         help="PDF render resolution, dots per inch (default: %(default)s)",
     )
     parser.add_argument(
-        "--threshold", type=int, default=10,
+        "--threshold",
+        type=int,
+        default=10,
         help="luminance threshold (0-255) for counting a pixel as ink (default: %(default)s)",
     )
     parser.add_argument(
-        "--fail-on-diff", action="store_true",
+        "--fail-on-diff",
+        action="store_true",
         help="exit with code 1 if anything differs (useful in CI)",
+    )
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        help="suppress renderer warnings (e.g. pygerber's parser notices)",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     return parser
@@ -73,6 +103,17 @@ def _print_summary(result: DiffResult) -> None:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
 
+    if args.quiet:
+        logging.getLogger().setLevel(logging.ERROR)
+        warnings.simplefilter("ignore")
+
+    if args.dpmm <= 0 or args.dpi <= 0 or not (0 <= args.threshold <= 255):
+        print(
+            "error: --dpmm and --dpi must be > 0, and --threshold must be in 0-255",
+            file=sys.stderr,
+        )
+        return 2
+
     try:
         result = run_diff(
             args.old, args.new, dpmm=args.dpmm, dpi=args.dpi, threshold=args.threshold
@@ -82,15 +123,26 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if not result.layers:
-        print("error: nothing to compare (no Gerber/drill files or PDF pages found)", file=sys.stderr)
+        print(
+            "error: nothing to compare (no Gerber/drill files or PDF pages found)", file=sys.stderr
+        )
         return 2
 
     generated = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     write_report(result, args.output, generated_at=generated)
+    if args.json_path is not None:
+        from .report import render_json
 
-    print(f"Compared {len(result.layers)} {result.subject}s ({len(result.changed_layers)} changed):")
+        args.json_path.parent.mkdir(parents=True, exist_ok=True)
+        args.json_path.write_text(render_json(result), encoding="utf-8")
+
+    print(
+        f"Compared {len(result.layers)} {result.subject}s ({len(result.changed_layers)} changed):"
+    )
     _print_summary(result)
     print(f"\nReport written to {args.output}")
+    if args.json_path is not None:
+        print(f"JSON summary written to {args.json_path}")
 
     if args.fail_on_diff and result.any_changes:
         return 1

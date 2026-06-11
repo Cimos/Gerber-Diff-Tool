@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gerber-diff"
-version = "0.1.0"
+version = "0.2.0"
 description = "Free, offline visual diff for PCB Gerber files and schematic PDFs."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -32,17 +32,16 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "pytest-cov>=5.0", "ruff>=0.6"]
 
 [project.scripts]
 gdiff = "gerberdiff.cli:main"
 gdiff-gui = "gerberdiff.gui:main"
 
 [project.urls]
-# TODO: replace OWNER with the GitHub account this lands under before publishing.
-Homepage = "https://github.com/OWNER/Gerber-Diff-Tool"
-Repository = "https://github.com/OWNER/Gerber-Diff-Tool"
-Issues = "https://github.com/OWNER/Gerber-Diff-Tool/issues"
+Homepage = "https://github.com/Cimos/Gerber-Diff-Tool"
+Repository = "https://github.com/Cimos/Gerber-Diff-Tool"
+Issues = "https://github.com/Cimos/Gerber-Diff-Tool/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/gerberdiff"]
@@ -53,3 +52,22 @@ filterwarnings = [
     # pygerber's grammar uses pyparsing's deprecated oneOf(); not our concern.
     "ignore:'oneOf' deprecated:DeprecationWarning",
 ]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]  # long CSS string literals in report.py; formatter owns code width
+
+[tool.coverage.run]
+source = ["gerberdiff"]
+branch = true
+omit = [
+    "src/gerberdiff/gui.py",       # Tk UI not headless-testable (import + no-Tk guard are)
+    "src/gerberdiff/__main__.py",  # thin `python -m gerberdiff` shim
+]
+
+[tool.coverage.report]
+exclude_also = ["if __name__ == .__main__.:"]

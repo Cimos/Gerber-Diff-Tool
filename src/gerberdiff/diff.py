@@ -17,9 +17,9 @@ from .models import LayerDiff, LayerPair
 
 # Overlay colours, RGB.
 COLOR_BACKGROUND = (18, 18, 18)
-COLOR_COMMON = (110, 110, 110)   # ink present in both revisions
-COLOR_ADDED = (40, 200, 60)      # present in B (new), absent in A  -> green
-COLOR_REMOVED = (220, 50, 50)    # present in A (old), absent in B  -> red
+COLOR_COMMON = (110, 110, 110)  # ink present in both revisions
+COLOR_ADDED = (40, 200, 60)  # present in B (new), absent in A  -> green
+COLOR_REMOVED = (220, 50, 50)  # present in A (old), absent in B  -> red
 
 
 def presence_mask(image: Image.Image, threshold: int) -> np.ndarray:
@@ -43,9 +43,7 @@ def _pad_to(mask: np.ndarray, size: tuple[int, int]) -> np.ndarray:
     return out
 
 
-def diff_masks(
-    mask_a: np.ndarray, mask_b: np.ndarray
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def diff_masks(mask_a: np.ndarray, mask_b: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Return (added, removed, common) boolean masks for A=old, B=new."""
     height = max(mask_a.shape[0], mask_b.shape[0])
     width = max(mask_a.shape[1], mask_b.shape[1])
@@ -54,9 +52,7 @@ def diff_masks(
     return (b & ~a), (a & ~b), (a & b)
 
 
-def overlay_image(
-    added: np.ndarray, removed: np.ndarray, common: np.ndarray
-) -> Image.Image:
+def overlay_image(added: np.ndarray, removed: np.ndarray, common: np.ndarray) -> Image.Image:
     """Compose the three masks into a single RGB overlay image."""
     height, width = added.shape
     rgb = np.empty((height, width, 3), dtype=np.uint8)

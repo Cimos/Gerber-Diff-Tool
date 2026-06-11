@@ -108,7 +108,8 @@ class App:
 
     def _browse_output(self) -> None:
         path = filedialog.asksaveasfilename(
-            title="Save report as", defaultextension=".html",
+            title="Save report as",
+            defaultextension=".html",
             filetypes=[("HTML report", "*.html")],
         )
         if path:
@@ -141,7 +142,9 @@ class App:
             try:
                 result = run_diff(Path(old), Path(new), dpmm=dpmm, dpi=dpi, threshold=threshold)
                 if not result.layers:
-                    raise ValueError("nothing to compare (no Gerber/drill files or PDF pages found)")
+                    raise ValueError(
+                        "nothing to compare (no Gerber/drill files or PDF pages found)"
+                    )
                 generated = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
                 report = write_report(result, Path(out), generated_at=generated)
                 self.root.after(0, lambda: self._done(result, report))

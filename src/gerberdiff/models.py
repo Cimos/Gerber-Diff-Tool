@@ -8,15 +8,15 @@ touch a renderer.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 
 
-class PairStatus(str, Enum):
+class PairStatus(StrEnum):
     """How a layer relates between revision A (old) and revision B (new)."""
 
     MATCHED = "matched"  # present in both revisions
-    ADDED = "added"      # present only in B (a new layer)
+    ADDED = "added"  # present only in B (a new layer)
     REMOVED = "removed"  # present only in A (a dropped layer)
 
 
@@ -24,11 +24,11 @@ class PairStatus(str, Enum):
 class LayerPair:
     """A single layer matched (or not) across the two revisions."""
 
-    key: str               # normalised pairing key (lower-cased file name)
-    layer_type: str        # human label, e.g. "Top Copper"
+    key: str  # normalised pairing key (lower-cased file name)
+    layer_type: str  # human label, e.g. "Top Copper"
     status: PairStatus
-    path_a: Path | None    # file in revision A, or None if ADDED
-    path_b: Path | None    # file in revision B, or None if REMOVED
+    path_a: Path | None  # file in revision A, or None if ADDED
+    path_b: Path | None  # file in revision B, or None if REMOVED
 
 
 @dataclass
@@ -38,9 +38,9 @@ class LayerDiff:
     pair: LayerPair
     width: int = 0
     height: int = 0
-    added_pixels: int = 0     # set in B, clear in A  (drawn green)
-    removed_pixels: int = 0   # set in A, clear in B  (drawn red)
-    common_pixels: int = 0    # set in both           (drawn grey)
+    added_pixels: int = 0  # set in B, clear in A  (drawn green)
+    removed_pixels: int = 0  # set in A, clear in B  (drawn red)
+    common_pixels: int = 0  # set in both           (drawn grey)
     overlay_png: bytes | None = None  # PNG bytes of the diff overlay image
     error: str | None = None  # populated if rendering/diffing this layer failed
 
@@ -51,6 +51,8 @@ class LayerDiff:
     @property
     def changed(self) -> bool:
         """True if the geometry differs, or the layer was added/removed."""
+        if self.error is not None:
+            return True
         if self.pair.status is not PairStatus.MATCHED:
             return True
         return self.changed_pixels > 0
@@ -62,7 +64,7 @@ class DiffResult:
 
     dir_a: Path
     dir_b: Path
-    resolution: str = ""    # e.g. "20 dpmm" (gerber) or "150 dpi" (pdf)
+    resolution: str = ""  # e.g. "20 dpmm" (gerber) or "150 dpi" (pdf)
     subject: str = "layer"  # "layer" for gerbers, "page" for PDFs
     layers: list[LayerDiff] = field(default_factory=list)
 

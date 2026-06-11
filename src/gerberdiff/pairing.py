@@ -24,13 +24,40 @@ from .models import LayerPair, PairStatus
 # ``.gbr``/``.drl`` while Protel-style exports use per-layer extensions.
 GERBER_EXTS: frozenset[str] = frozenset(
     {
-        ".gbr", ".ger", ".gb", ".art", ".pho", ".gerber",
+        ".gbr",
+        ".ger",
+        ".gb",
+        ".art",
+        ".pho",
+        ".gerber",
         # Protel / Altium per-layer copper, mask, paste, silk, outline
-        ".gtl", ".gbl", ".gto", ".gbo", ".gts", ".gbs", ".gtp", ".gbp",
-        ".gko", ".gm1", ".gm2", ".gml", ".gpt", ".gpb",
-        ".g1", ".g2", ".g3", ".g4", ".g5", ".g6",
+        ".gtl",
+        ".gbl",
+        ".gto",
+        ".gbo",
+        ".gts",
+        ".gbs",
+        ".gtp",
+        ".gbp",
+        ".gko",
+        ".gm1",
+        ".gm2",
+        ".gml",
+        ".gpt",
+        ".gpb",
+        ".g1",
+        ".g2",
+        ".g3",
+        ".g4",
+        ".g5",
+        ".g6",
         # Drill / Excellon
-        ".drl", ".xln", ".txt", ".nc", ".tap", ".exc",
+        ".drl",
+        ".xln",
+        ".txt",
+        ".nc",
+        ".tap",
+        ".exc",
     }
 )
 

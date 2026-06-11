@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import html
+import json
 
 from .models import DiffResult, LayerDiff, PairStatus
 
@@ -127,6 +128,34 @@ def _layer_card(layer: LayerDiff) -> str:
     )
 
 
+def render_json(result: DiffResult) -> str:
+    """Machine-readable summary of a diff (no images) — for CI / automation."""
+    payload = {
+        "subject": result.subject,
+        "resolution": result.resolution,
+        "old": str(result.dir_a),
+        "new": str(result.dir_b),
+        "any_changes": result.any_changes,
+        "summary": {"total": len(result.layers), "changed": len(result.changed_layers)},
+        "layers": [
+            {
+                "key": layer.pair.key,
+                "type": layer.pair.layer_type,
+                "status": layer.pair.status.value,
+                "changed": layer.changed,
+                "added_pixels": layer.added_pixels,
+                "removed_pixels": layer.removed_pixels,
+                "common_pixels": layer.common_pixels,
+                "width": layer.width,
+                "height": layer.height,
+                "error": layer.error,
+            }
+            for layer in result.layers
+        ],
+    }
+    return json.dumps(payload, indent=2)
+
+
 def render_html(
     result: DiffResult, *, title: str = "Gerber Diff Report", generated_at: str | None = None
 ) -> str:
@@ -138,9 +167,7 @@ def render_html(
         else f"no {subject}s found"
     )
     rows = "\n".join(_summary_row(layer) for layer in result.layers)
-    cards = "\n".join(
-        _layer_card(layer) for layer in result.layers if layer.changed or layer.error
-    )
+    cards = "\n".join(_layer_card(layer) for layer in result.layers if layer.changed or layer.error)
     if not cards:
         cards = f'<p class="sub">No differences to show — every matched {subject} is identical.</p>'
 

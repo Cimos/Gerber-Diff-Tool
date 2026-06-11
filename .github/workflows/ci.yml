@@ -6,6 +6,23 @@ on:
   pull_request:
 
 jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --extra dev
+      - name: Ruff lint
+        run: uv run ruff check .
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
   test:
     name: test (${{ matrix.os }}, py${{ matrix.python-version }})
     runs-on: ${{ matrix.os }}
@@ -26,8 +43,8 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev
 
-      - name: Run tests
-        run: uv run pytest -q
+      - name: Run tests with coverage
+        run: uv run pytest -q --cov=gerberdiff --cov-report=term-missing --cov-fail-under=90
 
       - name: Smoke-test the CLI on the fixtures
-        run: uv run gdiff tests/fixtures/revA tests/fixtures/revB -o diff-report.html
+        run: uv run gdiff tests/fixtures/revA tests/fixtures/revB -o diff-report.html --json diff.json
