@@ -115,6 +115,31 @@ def test_run_diff_zip_with_single_root_folder(tmp_path: Path):
     assert result.any_changes  # descended into the single top-level folder
 
 
+def test_parallel_matches_serial(tmp_path: Path):
+    """jobs>1 fans layers across processes; results must equal the serial run."""
+    pytest.importorskip("pygerber")
+    a = tmp_path / "a"
+    b = tmp_path / "b"
+    a.mkdir()
+    b.mkdir()
+    src_a = (FIXTURES / "revA" / "fixture-F_Cu.gbr").read_text()
+    src_b = (FIXTURES / "revB" / "fixture-F_Cu.gbr").read_text()
+    layers = ["F_Cu", "B_Cu", "F_Mask", "B_Mask", "F_Silkscreen", "B_Silkscreen"]
+    for name in layers:  # 6 layers -> crosses the >=4 parallel threshold
+        (a / f"brd-{name}.gbr").write_text(src_a)
+        (b / f"brd-{name}.gbr").write_text(src_b if name == "F_Cu" else src_a)
+
+    serial = run_diff(a, b, dpmm=20, jobs=1)
+    parallel = run_diff(a, b, dpmm=20, jobs=2)
+    assert [lyr.pair.key for lyr in parallel.layers] == [lyr.pair.key for lyr in serial.layers]
+    assert [lyr.changed_pixels for lyr in parallel.layers] == [
+        lyr.changed_pixels for lyr in serial.layers
+    ]
+    assert [lyr.overlay_png for lyr in parallel.layers] == [
+        lyr.overlay_png for lyr in serial.layers
+    ]
+
+
 def test_run_diff_bad_gerber_becomes_error_layer(tmp_path: Path):
     pytest.importorskip("pygerber")
     a = tmp_path / "a"

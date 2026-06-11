@@ -154,6 +154,20 @@ def test_invalid_threshold_exit_2(tmp_path: Path):
     assert code == 2
 
 
+def test_invalid_jobs_exit_2(tmp_path: Path):
+    code = main(
+        [
+            str(FIXTURES / "revA"),
+            str(FIXTURES / "revB"),
+            "--jobs",
+            "-1",
+            "-o",
+            str(tmp_path / "r.html"),
+        ]
+    )
+    assert code == 2
+
+
 def test_invalid_dpi_exit_2(tmp_path: Path):
     code = main(
         [

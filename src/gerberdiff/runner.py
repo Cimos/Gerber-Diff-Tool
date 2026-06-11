@@ -31,6 +31,44 @@ def is_zip(path: Path) -> bool:
     return path.is_file() and path.suffix.lower() == ".zip"
 
 
+def _diff_one_layer(pair, dpmm: int, threshold: int) -> LayerDiff:
+    """Render + diff a single layer pair; errors become error-layers.
+
+    Module-level and picklable so it runs identically in the serial loop and in
+    :class:`~concurrent.futures.ProcessPoolExecutor` workers.
+    """
+    from .render import render_aligned_pair
+
+    try:
+        aligned = render_aligned_pair(pair.path_a, pair.path_b, dpmm=dpmm)
+        layer = diff_layer(pair, aligned.image_a, aligned.image_b, threshold=threshold, dpmm=dpmm)
+        if not aligned.co_registered:
+            layer.warning = "inputs not co-registered (different extents) — diff may be offset"
+        return layer
+    except Exception as exc:  # noqa: BLE001 - one bad layer must not abort the run
+        return LayerDiff(pair=pair, error=f"{type(exc).__name__}: {exc}")
+
+
+def _diff_layers_parallel(
+    pairs: list, dpmm: int, threshold: int, jobs: int, progress: ProgressFn | None
+) -> list[LayerDiff]:
+    """Fan the per-layer work across processes; results keep input order."""
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+
+    results: list[LayerDiff | None] = [None] * len(pairs)
+    with ProcessPoolExecutor(max_workers=min(jobs, len(pairs), 8)) as pool:
+        futures = {
+            pool.submit(_diff_one_layer, pair, dpmm, threshold): index
+            for index, pair in enumerate(pairs)
+        }
+        for done, future in enumerate(as_completed(futures)):
+            index = futures[future]
+            results[index] = future.result()
+            if progress is not None:
+                progress(done, len(pairs), pairs[index].layer_type)
+    return [layer for layer in results if layer is not None]
+
+
 def _materialize(path: Path, stack: ExitStack) -> Path:
     """Return a directory for *path*, extracting zip archives to a temp dir.
 
@@ -56,10 +94,12 @@ def run_diff(
     dpmm: int = 20,
     dpi: int = 150,
     threshold: int = 10,
+    jobs: int = 0,
     progress: ProgressFn | None = None,
 ) -> DiffResult:
     """Diff two inputs, auto-detecting Gerber-folder / zip / PDF mode.
 
+    ``jobs`` controls gerber-layer parallelism: 0 = auto (CPU count), 1 = serial.
     Raises ``ValueError`` if the inputs aren't two Gerber sources (folder or
     zip, mixable) or two PDFs.
     """
@@ -79,25 +119,22 @@ def run_diff(
         new_dir = _materialize(new, stack)
 
         if old_dir.is_dir() and new_dir.is_dir():
-            from .render import render_aligned_pair
+            import os
 
             pairs = pair_layers(old_dir, new_dir)
-            layers: list[LayerDiff] = []
-            for index, pair in enumerate(pairs):
-                if progress is not None:
-                    progress(index, len(pairs), pair.layer_type)
+            resolved_jobs = jobs if jobs > 0 else (os.cpu_count() or 1)
+            layers: list[LayerDiff] | None = None
+            if resolved_jobs > 1 and len(pairs) >= 4:
                 try:
-                    aligned = render_aligned_pair(pair.path_a, pair.path_b, dpmm=dpmm)
-                    layer = diff_layer(
-                        pair, aligned.image_a, aligned.image_b, threshold=threshold, dpmm=dpmm
-                    )
-                    if not aligned.co_registered:
-                        layer.warning = (
-                            "inputs not co-registered (different extents) — diff may be offset"
-                        )
-                    layers.append(layer)
-                except Exception as exc:  # noqa: BLE001 - one bad layer must not abort
-                    layers.append(LayerDiff(pair=pair, error=f"{type(exc).__name__}: {exc}"))
+                    layers = _diff_layers_parallel(pairs, dpmm, threshold, resolved_jobs, progress)
+                except (OSError, RuntimeError):  # pool unavailable -> serial fallback
+                    layers = None
+            if layers is None:
+                layers = []
+                for index, pair in enumerate(pairs):
+                    if progress is not None:
+                        progress(index, len(pairs), pair.layer_type)
+                    layers.append(_diff_one_layer(pair, dpmm, threshold))
             # Reports show the inputs as given (the zip path, not the temp dir).
             return DiffResult(
                 dir_a=old, dir_b=new, resolution=f"{dpmm} dpmm", subject="layer", layers=layers

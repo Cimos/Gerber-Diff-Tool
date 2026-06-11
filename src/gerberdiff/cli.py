@@ -90,6 +90,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="luminance threshold (0-255) for counting a pixel as ink (default: %(default)s)",
     )
     parser.add_argument(
+        "--jobs",
+        type=int,
+        default=0,
+        help="parallel render workers for gerber layers; 0 = auto, 1 = serial "
+        "(default: %(default)s)",
+    )
+    parser.add_argument(
         "--fail-on-diff",
         action="store_true",
         help="exit with code 1 if anything differs (useful in CI)",
@@ -126,9 +133,9 @@ def main(argv: list[str] | None = None) -> int:
         logging.getLogger().setLevel(logging.ERROR)
         warnings.simplefilter("ignore")
 
-    if args.dpmm <= 0 or args.dpi <= 0 or not (0 <= args.threshold <= 255):
+    if args.dpmm <= 0 or args.dpi <= 0 or not (0 <= args.threshold <= 255) or args.jobs < 0:
         print(
-            "error: --dpmm and --dpi must be > 0, and --threshold must be in 0-255",
+            "error: --dpmm and --dpi must be > 0, --threshold in 0-255, --jobs >= 0",
             file=sys.stderr,
         )
         return 2
@@ -144,14 +151,24 @@ def main(argv: list[str] | None = None) -> int:
                 old_dir = materialize_ref(str(args.old), args.git_subdir, Path(tmp) / "a")
                 new_dir = materialize_ref(str(args.new), args.git_subdir, Path(tmp) / "b")
                 result = run_diff(
-                    old_dir, new_dir, dpmm=args.dpmm, dpi=args.dpi, threshold=args.threshold
+                    old_dir,
+                    new_dir,
+                    dpmm=args.dpmm,
+                    dpi=args.dpi,
+                    threshold=args.threshold,
+                    jobs=args.jobs,
                 )
             # Display the refs, not the temp paths, in reports and summaries.
             result.dir_a = Path(f"{args.old}:{args.git_subdir}")
             result.dir_b = Path(f"{args.new}:{args.git_subdir}")
         else:
             result = run_diff(
-                args.old, args.new, dpmm=args.dpmm, dpi=args.dpi, threshold=args.threshold
+                args.old,
+                args.new,
+                dpmm=args.dpmm,
+                dpi=args.dpi,
+                threshold=args.threshold,
+                jobs=args.jobs,
             )
     except ValueError as exc:  # includes GitRefError
         print(f"error: {exc}", file=sys.stderr)

@@ -16,6 +16,8 @@
 > **v0.7.0**: zip-archive inputs (fab packages diff without manual extraction)
 > and content-based PDF page pairing — an inserted sheet no longer cascades
 > into false "changed" reports (resolves the P3-era low-severity finding #9).
+> **v0.8.0**: parallel layer rendering (process pool, auto for ≥4 layers,
+> `--jobs` control) — measured 15.8 s → 6.1 s on the 18-layer reference board.
 
 ## Method
 
