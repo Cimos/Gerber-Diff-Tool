@@ -3,6 +3,13 @@
 - Date: 2026-06-11 · Against: v0.3.0
 - Surfaces audited: desktop GUI (`gui.py`), HTML report (`report.py`), CLI (`cli.py`), diff overlay (`diff.py`).
 
+> **Status:** P0–P2 implemented in **v0.4.0** — colour-blind-safe blue/orange + hatch
+> encoding, change-region marker + size in mm, co-registration warning, accessible
+> Compare button + keyboard operability, report swipe/onion/zoom viewer with
+> lead-with-the-answer table (changed-first + "only changed" filter + jump links),
+> live progress + empty/error states, setup memory, report a11y semantics, and
+> documentation-layer classification. **P3 remains** (GitHub Action, git-ref inputs).
+
 ## Method
 
 - **Peer-review panel** — three independent expert passes over the actual code + rendered

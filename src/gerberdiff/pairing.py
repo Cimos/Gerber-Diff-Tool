@@ -72,6 +72,14 @@ _LAYER_RULES: list[tuple[re.Pattern[str], str]] = [
     (re.compile(r"(b[._-]?silks?|bot.?silk|\.gbo$)", re.I), "Bottom Silkscreen"),
     (re.compile(r"(f[._-]?paste|top.?paste|\.gtp$)", re.I), "Top Paste"),
     (re.compile(r"(b[._-]?paste|bot.?paste|\.gbp$)", re.I), "Bottom Paste"),
+    (re.compile(r"(f[._-]?fab|fabrication.*top)", re.I), "Top Fab"),
+    (re.compile(r"(b[._-]?fab|fabrication.*bot)", re.I), "Bottom Fab"),
+    (re.compile(r"courtyard", re.I), "Courtyard"),
+    (re.compile(r"(adhesive|glue)", re.I), "Adhesive"),
+    (
+        re.compile(r"(user[._-]?(comments|drawings|eco)|\beco\d?\b|margin|cmts|drawings?)", re.I),
+        "Documentation",
+    ),
     (re.compile(r"(edge|outline|\.gko$|\.gml?$|\.gm\d$)", re.I), "Board Outline"),
     (re.compile(r"(drl|drill|excellon|\.xln$|\.nc$|\.exc$|\.tap$)", re.I), "Drill"),
 ]

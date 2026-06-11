@@ -90,6 +90,16 @@ def test_removed_page_when_a_has_more_pages(tmp_path: Path):
     assert diffs[1].pair.status is PairStatus.REMOVED
 
 
+def test_diff_pdfs_reports_progress(tmp_path: Path):
+    a = tmp_path / "a.pdf"
+    b = tmp_path / "b.pdf"
+    _make_pdf(a, "X")
+    _make_pdf(b, "X")
+    seen: list[str] = []
+    diff_pdfs(a, b, dpi=72, progress=lambda _i, _t, label: seen.append(label))
+    assert seen == ["Page 1"]
+
+
 def test_threshold_affects_pdf_diff(tmp_path: Path):
     a = tmp_path / "a.pdf"
     b = tmp_path / "b.pdf"

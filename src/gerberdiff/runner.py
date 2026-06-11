@@ -1,16 +1,21 @@
 """Shared diff runner used by both the CLI and the GUI.
 
 Keeps mode-detection and report-writing in one place so the two front-ends can't
-drift apart. Heavy renderer imports are deferred into the functions.
+drift apart. Heavy renderer imports are deferred into the functions. An optional
+*progress* callback is invoked as ``progress(index, total, label)`` before each
+layer/page so a UI can show per-item progress.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from .diff import diff_layer
 from .models import DiffResult, LayerDiff
 from .pairing import pair_layers
+
+ProgressFn = Callable[[int, int, str], None]
 
 
 def is_pdf(path: Path) -> bool:
@@ -24,6 +29,7 @@ def run_diff(
     dpmm: int = 20,
     dpi: int = 150,
     threshold: int = 10,
+    progress: ProgressFn | None = None,
 ) -> DiffResult:
     """Diff two inputs, auto-detecting Gerber-folder vs PDF mode.
 
@@ -35,19 +41,29 @@ def run_diff(
     if is_pdf(old) and is_pdf(new):
         from .pdfdiff import diff_pdfs
 
-        layers = diff_pdfs(old, new, dpi=dpi, threshold=threshold)
+        layers = diff_pdfs(old, new, dpi=dpi, threshold=threshold, progress=progress)
         return DiffResult(
             dir_a=old, dir_b=new, resolution=f"{dpi} dpi", subject="page", layers=layers
         )
 
     if old.is_dir() and new.is_dir():
-        from .render import render_pair_aligned
+        from .render import render_aligned_pair
 
+        pairs = pair_layers(old, new)
         layers: list[LayerDiff] = []
-        for pair in pair_layers(old, new):
+        for index, pair in enumerate(pairs):
+            if progress is not None:
+                progress(index, len(pairs), pair.layer_type)
             try:
-                image_a, image_b = render_pair_aligned(pair.path_a, pair.path_b, dpmm=dpmm)
-                layers.append(diff_layer(pair, image_a, image_b, threshold=threshold))
+                aligned = render_aligned_pair(pair.path_a, pair.path_b, dpmm=dpmm)
+                layer = diff_layer(
+                    pair, aligned.image_a, aligned.image_b, threshold=threshold, dpmm=dpmm
+                )
+                if not aligned.co_registered:
+                    layer.warning = (
+                        "inputs not co-registered (different extents) — diff may be offset"
+                    )
+                layers.append(layer)
             except Exception as exc:  # noqa: BLE001 - one bad layer must not abort
                 layers.append(LayerDiff(pair=pair, error=f"{type(exc).__name__}: {exc}"))
         return DiffResult(

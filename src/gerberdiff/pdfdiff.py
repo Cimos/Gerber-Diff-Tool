@@ -9,12 +9,15 @@ paired by index, and the existing :mod:`gerberdiff.diff` and
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from PIL import Image, ImageOps
 
 from .diff import diff_layer
 from .models import LayerDiff, LayerPair, PairStatus
+
+ProgressFn = Callable[[int, int, str], None]
 
 
 def render_pdf_pages(path: Path, *, dpi: int = 150) -> list[Image.Image]:
@@ -39,13 +42,17 @@ def diff_pdfs(
     *,
     dpi: int = 150,
     threshold: int = 10,
+    progress: ProgressFn | None = None,
 ) -> list[LayerDiff]:
     """Diff two PDFs page-by-page; returns one :class:`LayerDiff` per page."""
     pages_a = render_pdf_pages(pdf_a, dpi=dpi) if pdf_a else []
     pages_b = render_pdf_pages(pdf_b, dpi=dpi) if pdf_b else []
 
+    total = max(len(pages_a), len(pages_b))
     diffs: list[LayerDiff] = []
-    for index in range(max(len(pages_a), len(pages_b))):
+    for index in range(total):
+        if progress is not None:
+            progress(index, total, f"Page {index + 1}")
         image_a = pages_a[index] if index < len(pages_a) else None
         image_b = pages_b[index] if index < len(pages_b) else None
         if image_a is not None and image_b is not None:

@@ -74,3 +74,16 @@ def test_render_pair_identical_file_has_no_diff():
     diff = diff_layer(pair, image_a, image_b)
     assert diff.changed_pixels == 0
     assert diff.common_pixels > 0
+
+
+def test_aligned_pair_co_registration():
+    from gerberdiff.render import AlignedPair
+
+    # Same-size box at a different origin = a pure shift -> flagged.
+    shifted = AlignedPair(image_a=None, image_b=None, bbox_a=(0, 0, 5, 5), bbox_b=(1, 1, 6, 6))
+    assert shifted.co_registered is False
+    # A genuine extent change (box grew) is a real diff, not a mis-registration.
+    grew = AlignedPair(image_a=None, image_b=None, bbox_a=(0, 0, 5, 5), bbox_b=(0, 0, 5, 7))
+    assert grew.co_registered is True
+    # A one-sided (added/removed) layer has nothing to mis-register.
+    assert AlignedPair(image_a=None, image_b=None, bbox_a=(0, 0, 5, 5), bbox_b=None).co_registered

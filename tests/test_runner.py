@@ -57,6 +57,19 @@ def test_run_diff_pdf_mode(tmp_path: Path):
     assert result.any_changes
 
 
+def test_run_diff_reports_progress():
+    pytest.importorskip("pygerber")
+    calls: list[tuple[int, int, str]] = []
+    run_diff(
+        FIXTURES / "revA",
+        FIXTURES / "revB",
+        dpmm=20,
+        progress=lambda i, t, lbl: calls.append((i, t, lbl)),
+    )
+    assert calls
+    assert all(total == len(calls) for (_i, total, _lbl) in calls)
+
+
 def test_run_diff_rejects_mismatched_inputs(tmp_path: Path):
     folder = tmp_path / "d"
     folder.mkdir()

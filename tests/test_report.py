@@ -155,6 +155,7 @@ def test_render_json_layer_has_all_keys():
         "common_pixels",
         "width",
         "height",
+        "warning",
         "error",
     }
     assert set(data["layers"][0]) == expected

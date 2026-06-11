@@ -1,8 +1,10 @@
 """Modern desktop GUI for gerber-diff, built on stdlib Tkinter (no extra deps).
 
 Pick two folders of Gerber files — or two schematic PDFs — run the diff, and the
-self-contained HTML report opens in your browser. A rich in-app pan/zoom viewer
-is future work; for now the browser report is the viewer.
+self-contained HTML report opens in your browser. The in-app viewer is the
+report itself (side-by-side / swipe / zoom); the GUI is a thin, accessible
+launcher: keyboard-operable (Tab + Enter), with focus rings, live progress,
+remembered folders, and tooltips.
 
 Launch with ``gdiff-gui`` (or ``python -m gerberdiff.gui``).
 """
@@ -10,6 +12,7 @@ Launch with ``gdiff-gui`` (or ``python -m gerberdiff.gui``).
 from __future__ import annotations
 
 import datetime
+import json
 import sys
 import tempfile
 import threading
@@ -28,18 +31,21 @@ except ModuleNotFoundError:  # tkinter isn't bundled with every Python build
 
 from .runner import run_diff, write_report
 
-# Dark theme palette.
+# Dark theme palette (accent darkened to meet WCAG AA for white-on-accent text).
 _BG = "#16181d"
 _SURFACE = "#1e2128"
 _FIELD = "#262a33"
 _BORDER = "#30343d"
 _TEXT = "#e7e9ee"
 _MUTED = "#9aa0aa"
-_ACCENT = "#4f8cff"
-_ACCENT_HI = "#6ba0ff"
+_ACCENT = "#2f6fe0"  # white text on this = 4.7:1 (AA)
+_ACCENT_HI = "#2862c9"  # hover/focus: darker, so contrast improves on interaction
+_ACCENT_DIM = "#33436b"  # disabled/busy accent
 _SUCCESS = "#37c95a"
-_DANGER = "#ff5b52"
+_DANGER = "#ff6b61"
 _ON_ACCENT = "#ffffff"
+
+_CONFIG_PATH = Path.home() / ".gerber-diff.json"
 
 
 def parse_int_field(value: object, default: int) -> int:
@@ -50,12 +56,66 @@ def parse_int_field(value: object, default: int) -> int:
         return default
 
 
+def _load_config() -> dict:
+    try:
+        return json.loads(_CONFIG_PATH.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001 - config is best-effort
+        return {}
+
+
+def _save_config(data: dict) -> None:
+    try:
+        _CONFIG_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        pass
+
+
+class _Tooltip:
+    """Minimal hover tooltip for a widget (raw tk, no deps)."""
+
+    def __init__(self, widget: tk.Widget, text: str, font: tkfont.Font) -> None:
+        self.widget = widget
+        self.text = text
+        self.font = font
+        self.tip: tk.Toplevel | None = None
+        widget.bind("<Enter>", self._show)
+        widget.bind("<Leave>", self._hide)
+
+    def _show(self, _event: object = None) -> None:
+        if self.tip is not None:
+            return
+        x = self.widget.winfo_rootx() + 12
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 6
+        self.tip = tk.Toplevel(self.widget)
+        self.tip.wm_overrideredirect(True)
+        self.tip.wm_geometry(f"+{x}+{y}")
+        tk.Label(
+            self.tip,
+            text=self.text,
+            font=self.font,
+            bg="#0c0d10",
+            fg=_TEXT,
+            relief="solid",
+            borderwidth=1,
+            padx=8,
+            pady=4,
+            justify="left",
+            wraplength=260,
+        ).pack()
+
+    def _hide(self, _event: object = None) -> None:
+        if self.tip is not None:
+            self.tip.destroy()
+            self.tip = None
+
+
 class App:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         root.title("gerber-diff")
         root.configure(bg=_BG)
         root.minsize(600, 0)
+        self._cfg = _load_config()
 
         families = set(tkfont.families(root))
         family = next((f for f in ("Segoe UI", "Helvetica Neue", "Arial") if f in families), "")
@@ -65,17 +125,20 @@ class App:
         self.f_btn = tkfont.Font(root=root, family=family, size=11, weight="bold")
         self.f_label = tkfont.Font(root=root, family=family, size=9, weight="bold")
 
+        default_out = self._cfg.get("output") or str(
+            Path(tempfile.gettempdir()) / "gerber-diff-report.html"
+        )
+        self._last_dir = self._cfg.get("last_dir") or str(Path.home())
         self.old_var = tk.StringVar()
         self.new_var = tk.StringVar()
-        self.out_var = tk.StringVar(
-            value=str(Path(tempfile.gettempdir()) / "gerber-diff-report.html")
-        )
-        self.dpmm_var = tk.StringVar(value="20")
-        self.dpi_var = tk.StringVar(value="150")
-        self.threshold_var = tk.StringVar(value="10")
+        self.out_var = tk.StringVar(value=default_out)
+        self.dpmm_var = tk.StringVar(value=str(self._cfg.get("dpmm", 20)))
+        self.dpi_var = tk.StringVar(value=str(self._cfg.get("dpi", 150)))
+        self.threshold_var = tk.StringVar(value=str(self._cfg.get("threshold", 10)))
         self.mode_var = tk.StringVar(value="Choose two folders of Gerbers, or two schematic PDFs.")
-        self.status_var = tk.StringVar(value="Ready.")
+        self.status_var = tk.StringVar(value="Ready — pick Revision A and B, then Compare.")
         self._last_report: Path | None = None
+        self._first_field: tk.Entry | None = None
 
         self._build()
         for var in (self.old_var, self.new_var):
@@ -115,17 +178,25 @@ class App:
             relief="flat",
             bd=0,
             cursor="hand2",
-            highlightthickness=0,
+            highlightthickness=2,
+            highlightbackground=bg,
+            highlightcolor=_ACCENT_HI,
             padx=14,
             pady=10 if kind == "accent" else 6,
         )
-        button.bind(
-            "<Enter>",
-            lambda e, w=button, h=hover: w.cget("state") != "disabled" and w.configure(bg=h),
-        )
-        button.bind(
-            "<Leave>", lambda e, w=button, b=bg: w.cget("state") != "disabled" and w.configure(bg=b)
-        )
+
+        def enter(_e: object) -> None:
+            if str(button["state"]) != "disabled":
+                button.configure(bg=hover)
+
+        def leave(_e: object) -> None:
+            if str(button["state"]) != "disabled":
+                button.configure(bg=bg)
+
+        button.bind("<Enter>", enter)
+        button.bind("<Leave>", leave)
+        button.bind("<FocusIn>", enter)  # focus is visible by fill + ring
+        button.bind("<FocusOut>", leave)
         return button
 
     def _card(self, parent: tk.Widget) -> tk.Frame:
@@ -151,8 +222,8 @@ class App:
         card = self._card(outer)
         card.grid(row=2, column=0, sticky="ew")
         card.columnconfigure(1, weight=1)
-        self._input_row(card, 0, "Revision A — old", self.old_var)
-        self._input_row(card, 1, "Revision B — new", self.new_var)
+        self._first_field = self._input_row(card, 0, "Revision A — old", self.old_var, None)
+        self._input_row(card, 1, "Revision B — new", self.new_var, self.old_var)
         tk.Label(card, textvariable=self.mode_var, font=self.f_small, bg=_SURFACE, fg=_MUTED).grid(
             row=2, column=0, columnspan=4, sticky="w", padx=14, pady=(2, 10)
         )
@@ -167,9 +238,23 @@ class App:
 
         opts = tk.Frame(card, bg=_SURFACE)
         opts.grid(row=4, column=0, columnspan=4, sticky="w", padx=14, pady=(4, 14))
-        self._option(opts, 0, "Gerber dpmm", self.dpmm_var)
-        self._option(opts, 2, "PDF dpi", self.dpi_var)
-        self._option(opts, 4, "Threshold", self.threshold_var)
+        self._option(
+            opts,
+            0,
+            "Gerber dpmm",
+            self.dpmm_var,
+            "Gerber render resolution in dots per mm. Higher = sharper diff but slower and larger report.",
+        )
+        self._option(
+            opts, 2, "PDF dpi", self.dpi_var, "Schematic-PDF render resolution in dots per inch."
+        )
+        self._option(
+            opts,
+            4,
+            "Threshold",
+            self.threshold_var,
+            "Luminance 0–255: how bright a pixel must be to count as ink. Raise to ignore faint anti-aliasing.",
+        )
 
         self.compare_btn = self._button(outer, "Compare", self._on_compare, kind="accent")
         self.compare_btn.grid(row=3, column=0, sticky="ew", pady=(16, 10))
@@ -191,24 +276,35 @@ class App:
         self.open_btn = self._button(results, "Open report", self._open_report)
         # open_btn is gridded only after a successful compare.
 
-    def _input_row(self, card: tk.Frame, index: int, label: str, var: tk.StringVar) -> None:
+    def _input_row(
+        self,
+        card: tk.Frame,
+        index: int,
+        label: str,
+        var: tk.StringVar,
+        sibling: tk.StringVar | None,
+    ) -> tk.Entry:
         top = 14 if index == 0 else 6
         tk.Label(card, text=label, font=self.f_label, bg=_SURFACE, fg=_MUTED).grid(
             row=index, column=0, sticky="w", padx=(14, 8), pady=(top, 6)
         )
-        self._entry(card, var).grid(row=index, column=1, sticky="ew", ipady=5, pady=(top, 6))
-        self._button(card, "Folder…", lambda: self._browse_folder(var)).grid(
+        entry = self._entry(card, var)
+        entry.grid(row=index, column=1, sticky="ew", ipady=5, pady=(top, 6))
+        self._button(card, "Folder…", lambda: self._browse_folder(var, sibling)).grid(
             row=index, column=2, sticky="ew", padx=8, pady=(top, 6)
         )
         self._button(card, "PDF…", lambda: self._browse_pdf(var)).grid(
             row=index, column=3, sticky="ew", padx=(0, 14), pady=(top, 6)
         )
+        return entry
 
-    def _option(self, parent: tk.Frame, col: int, label: str, var: tk.StringVar) -> None:
-        tk.Label(parent, text=label, font=self.f_small, bg=_SURFACE, fg=_MUTED).grid(
-            row=0, column=col, padx=(0, 6)
-        )
-        self._entry(parent, var, width=6).grid(row=0, column=col + 1, ipady=3, padx=(0, 18))
+    def _option(self, parent: tk.Frame, col: int, label: str, var: tk.StringVar, tip: str) -> None:
+        lbl = tk.Label(parent, text=label, font=self.f_small, bg=_SURFACE, fg=_MUTED)
+        lbl.grid(row=0, column=col, padx=(0, 6))
+        entry = self._entry(parent, var, width=6)
+        entry.grid(row=0, column=col + 1, ipady=3, padx=(0, 18))
+        _Tooltip(lbl, tip, self.f_small)
+        _Tooltip(entry, tip, self.f_small)
 
     # --- behaviour --------------------------------------------------------
     def _set_status(self, text: str, kind: str = "info") -> None:
@@ -225,17 +321,24 @@ class App:
         else:
             self.mode_var.set("Choose two folders of Gerbers, or two schematic PDFs.")
 
-    def _browse_folder(self, var: tk.StringVar) -> None:
-        path = filedialog.askdirectory(title="Choose a folder of Gerber files")
+    def _browse_folder(self, var: tk.StringVar, sibling: tk.StringVar | None) -> None:
+        initial = self._last_dir
+        if sibling is not None and sibling.get().strip():
+            initial = str(Path(sibling.get().strip()).parent)  # default B next to A
+        path = filedialog.askdirectory(title="Choose a folder of Gerber files", initialdir=initial)
         if path:
             var.set(path)
+            self._last_dir = str(Path(path).parent)
 
     def _browse_pdf(self, var: tk.StringVar) -> None:
         path = filedialog.askopenfilename(
-            title="Choose a schematic PDF", filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")]
+            title="Choose a schematic PDF",
+            initialdir=self._last_dir,
+            filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
         )
         if path:
             var.set(path)
+            self._last_dir = str(Path(path).parent)
 
     def _browse_output(self) -> None:
         path = filedialog.asksaveasfilename(
@@ -246,6 +349,17 @@ class App:
         if path:
             self.out_var.set(path)
 
+    def _persist(self, dpmm: int, dpi: int, threshold: int) -> None:
+        _save_config(
+            {
+                "last_dir": self._last_dir,
+                "output": self.out_var.get().strip(),
+                "dpmm": dpmm,
+                "dpi": dpi,
+                "threshold": threshold,
+            }
+        )
+
     def _on_compare(self) -> None:
         old = self.old_var.get().strip()
         new = self.new_var.get().strip()
@@ -255,15 +369,29 @@ class App:
             return
 
         self.open_btn.grid_remove()
-        self.compare_btn.config(state="disabled", bg=_FIELD)
+        self.compare_btn.config(state="disabled", text="Comparing…", bg=_ACCENT_DIM)
+        self.root.configure(cursor="watch")
         self._set_status("Comparing…")
         dpmm = parse_int_field(self.dpmm_var.get(), 20)
         dpi = parse_int_field(self.dpi_var.get(), 150)
         threshold = parse_int_field(self.threshold_var.get(), 10)
+        self._persist(dpmm, dpi, threshold)
+
+        def on_progress(index: int, total: int, label: str) -> None:
+            self.root.after(
+                0, lambda: self._set_status(f"Rendering {label} ({index + 1}/{total})…")
+            )
 
         def work() -> None:
             try:
-                result = run_diff(Path(old), Path(new), dpmm=dpmm, dpi=dpi, threshold=threshold)
+                result = run_diff(
+                    Path(old),
+                    Path(new),
+                    dpmm=dpmm,
+                    dpi=dpi,
+                    threshold=threshold,
+                    progress=on_progress,
+                )
                 if not result.layers:
                     raise ValueError(
                         "nothing to compare (no Gerber/drill files or PDF pages found)"
@@ -271,28 +399,35 @@ class App:
                 generated = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
                 report = write_report(result, Path(out), generated_at=generated)
                 self.root.after(0, lambda: self._done(result, report))
-            except Exception as exc:  # noqa: BLE001 - surface any failure in the UI
+            except ValueError as exc:  # expected, user-fixable
+                message = str(exc)
+                self.root.after(0, lambda: self._fail(message))
+            except Exception as exc:  # noqa: BLE001 - unexpected: show type for bug reports
                 message = f"{type(exc).__name__}: {exc}"
                 self.root.after(0, lambda: self._fail(message))
 
         threading.Thread(target=work, daemon=True).start()
 
+    def _reset_button(self) -> None:
+        self.compare_btn.config(state="normal", text="Compare", bg=_ACCENT)
+        self.root.configure(cursor="")
+
     def _done(self, result, report: Path) -> None:
-        changed = len(result.changed_layers)
         self._last_report = report
+        changed = len(result.changed_layers)
         noun = result.subject + ("s" if len(result.layers) != 1 else "")
         kind = "error" if changed else "success"
-        verb = "differ" if changed else "identical"
+        tail = "differ" if changed else "identical"
         self._set_status(
-            f"Compared {len(result.layers)} {noun}: {changed} changed — {verb}.", kind=kind
+            f"✓ Compared {len(result.layers)} {noun}: {changed} changed — {tail}.", kind=kind
         )
-        self.compare_btn.config(state="normal", bg=_ACCENT)
+        self._reset_button()
         self.open_btn.grid(row=0, column=1, sticky="e", padx=(10, 0))
         webbrowser.open(report.resolve().as_uri())
 
     def _fail(self, message: str) -> None:
-        self._set_status(f"Error: {message}", kind="error")
-        self.compare_btn.config(state="normal", bg=_ACCENT)
+        self._set_status(f"✕ {message}", kind="error")
+        self._reset_button()
 
     def _open_report(self) -> None:
         if self._last_report is not None:
@@ -309,7 +444,10 @@ def main() -> int:
         )
         return 1
     root = tk.Tk()
-    App(root)
+    app = App(root)
+    root.bind("<Return>", lambda _e: app._on_compare())
+    if app._first_field is not None:
+        app._first_field.focus_set()
     root.mainloop()
     return 0
 

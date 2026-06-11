@@ -102,13 +102,27 @@ def test_diff_masks_pads_to_common_size():
 
 
 def test_overlay_image_uses_expected_colours():
-    added = np.array([[True, False, False]])
-    removed = np.array([[False, True, False]])
-    common = np.array([[False, False, True]])
+    # columns chosen so the removed pixel lands off the diagonal hatch (solid).
+    added = np.zeros((1, 7), dtype=bool)
+    removed = np.zeros((1, 7), dtype=bool)
+    common = np.zeros((1, 7), dtype=bool)
+    added[0, 0] = True
+    removed[0, 3] = True  # (x+y)=3 -> not hatched -> solid removed colour
+    common[0, 6] = True
     px = np.asarray(overlay_image(added, removed, common))
     assert tuple(px[0, 0]) == COLOR_ADDED
-    assert tuple(px[0, 1]) == COLOR_REMOVED
-    assert tuple(px[0, 2]) == COLOR_COMMON
+    assert tuple(px[0, 3]) == COLOR_REMOVED
+    assert tuple(px[0, 6]) == COLOR_COMMON
+
+
+def test_removed_region_is_hatched():
+    from gerberdiff.diff import COLOR_REMOVED_HATCH
+
+    removed = np.ones((8, 8), dtype=bool)
+    blank = np.zeros((8, 8), dtype=bool)
+    colours = {tuple(c) for c in np.asarray(overlay_image(blank, removed, blank)).reshape(-1, 3)}
+    assert COLOR_REMOVED in colours  # base orange
+    assert COLOR_REMOVED_HATCH in colours  # hatch stripes -> redundant non-colour channel
 
 
 def test_png_bytes_has_png_signature():
