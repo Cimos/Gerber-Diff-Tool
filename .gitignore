@@ -8,6 +8,10 @@ dist/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
 
 # Virtual environments / uv
 .venv/
