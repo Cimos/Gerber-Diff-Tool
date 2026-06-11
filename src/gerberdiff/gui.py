@@ -1,10 +1,10 @@
 """Modern desktop GUI for gerber-diff, built on stdlib Tkinter (no extra deps).
 
-Pick two folders of Gerber files — or two schematic PDFs — run the diff, and the
-self-contained HTML report opens in your browser. The in-app viewer is the
-report itself (side-by-side / swipe / zoom); the GUI is a thin, accessible
-launcher: keyboard-operable (Tab + Enter), with focus rings, live progress,
-remembered folders, and tooltips.
+Pick two folders/zips of Gerbers — or two schematic PDFs — hit Compare, and a
+native, layer-by-layer viewer opens (overlay / A / B / split / swipe / onion,
+with pan-zoom). The self-contained HTML report is written alongside as the
+shareable export. The launcher is keyboard-operable (Tab + Enter), with focus
+rings, live progress, remembered folders, and tooltips.
 
 Launch with ``gdiff-gui`` (or ``python -m gerberdiff.gui``).
 """
@@ -30,20 +30,20 @@ except ModuleNotFoundError:  # tkinter isn't bundled with every Python build
     _TK_AVAILABLE = False
 
 from .runner import run_diff, write_report
-
-# Dark theme palette (accent darkened to meet WCAG AA for white-on-accent text).
-_BG = "#16181d"
-_SURFACE = "#1e2128"
-_FIELD = "#262a33"
-_BORDER = "#30343d"
-_TEXT = "#e7e9ee"
-_MUTED = "#9aa0aa"
-_ACCENT = "#2f6fe0"  # white text on this = 4.7:1 (AA)
-_ACCENT_HI = "#2862c9"  # hover/focus: darker, so contrast improves on interaction
-_ACCENT_DIM = "#33436b"  # disabled/busy accent
-_SUCCESS = "#37c95a"
-_DANGER = "#ff6b61"
-_ON_ACCENT = "#ffffff"
+from .theme import (  # noqa: F401 - shared dark-theme palette tokens
+    _ACCENT,
+    _ACCENT_DIM,
+    _ACCENT_HI,
+    _BG,
+    _BORDER,
+    _DANGER,
+    _FIELD,
+    _MUTED,
+    _ON_ACCENT,
+    _SUCCESS,
+    _SURFACE,
+    _TEXT,
+)
 
 _CONFIG_PATH = Path.home() / ".gerber-diff.json"
 
@@ -432,7 +432,9 @@ class App:
         )
         self._reset_button()
         self.open_btn.grid(row=0, column=1, sticky="e", padx=(10, 0))
-        webbrowser.open(report.resolve().as_uri())
+        from .viewer import DiffViewer
+
+        DiffViewer(self.root, result, report)  # native layer-by-layer viewer
 
     def _fail(self, message: str) -> None:
         self._set_status(f"✕ {message}", kind="error")

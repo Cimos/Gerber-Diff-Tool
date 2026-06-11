@@ -12,22 +12,26 @@ overlay, in a self-contained HTML report you can attach to a review or archive.
 It runs entirely on your machine — nothing is uploaded — and the same engine
 drives a command line you can wire into CI and a small desktop GUI.
 
-> Status: **early alpha (v0.9).** Gerber **and** schematic-PDF diff both work,
+> Status: **early alpha (v0.10).** Gerber **and** schematic-PDF diff both work,
 > via a CLI (`gdiff`), a desktop GUI (`gdiff-gui`), and a reusable GitHub
 > Action that comments the diff on pull requests.
 
 ## Screenshots
 
-The HTML diff report — a per-layer summary plus a red (removed) / green (added) /
-grey (unchanged) overlay, shown here on a real KiCad board with one copper layer
-changed:
+The native viewer (`gdiff-gui`) — step through layers (changed first) and compare
+each with overlay / A / B / split / swipe / onion, with pan and zoom:
+
+![gerber-diff native viewer](docs/images/viewer.png)
+
+The self-contained HTML report it writes for sharing — a per-layer summary plus a
+colour-blind-safe orange (removed) / blue (added) / grey (unchanged) overlay, on a
+real KiCad board:
 
 ![gerber-diff HTML report](docs/images/report.png)
 
-The desktop GUI (`gdiff-gui`) — pick two folders or two PDFs, hit Compare, and the
-report opens in your browser:
+The launcher:
 
-![gerber-diff desktop GUI](docs/images/gui.png)
+![gerber-diff launcher](docs/images/gui.png)
 
 ## Why
 
@@ -38,7 +42,7 @@ native viewer ([GrbDiff](https://github.com/dennevi/GrbDiff) over `gerbv`).
 None of them are FOSS *and* cover **Gerber + schematic** in one lightweight,
 cross-platform, scriptable package. That's the gap this fills.
 
-## Features (v0.9)
+## Features (v0.10)
 
 - Compare two folders **or zip archives** of Gerber/drill files (fab packages
   work as-is), or two schematic PDFs — the mode is auto-detected.
@@ -64,7 +68,9 @@ cross-platform, scriptable package. That's the gap this fills.
   (split side-by-side with synchronized pan/zoom · swipe · onion-skin · A/B ·
   overlay), lead-with-the-answer table (changed-first, "only changed" filter,
   jump links), light/dark theme.
-- A desktop GUI (`gdiff-gui`) and a CLI (`gdiff`, also `python -m gerberdiff`).
+- A **native desktop viewer** (`gdiff-gui`): layer-by-layer (changed first) with
+  overlay / A / B / split / swipe / onion and pan-zoom — plus a CLI (`gdiff`,
+  also `python -m gerberdiff`).
 - `--fail-on-diff` exit code, `--json` machine-readable summary, and
   `--summary-md` Markdown summary for CI.
 - **Git-native**: `gdiff v1.0 HEAD --git gerbers/` diffs a directory as it
