@@ -29,6 +29,7 @@ except ModuleNotFoundError:  # tkinter isn't bundled with every Python build
     tk = None  # type: ignore[assignment]
     _TK_AVAILABLE = False
 
+from . import __version__
 from .runner import run_diff, write_report
 from .theme import (  # noqa: F401 - shared dark-theme palette tokens
     _ACCENT,
@@ -113,7 +114,7 @@ class _Tooltip:
 class App:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
-        root.title("gerber-diff")
+        root.title(f"gerber-diff {__version__}")
         root.configure(bg=_BG)
         root.minsize(600, 0)
         _ico = app_icon_path()
