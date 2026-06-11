@@ -7,7 +7,13 @@ import io
 import pytest
 from PIL import Image
 
-from gerberdiff.compose import compose_master, decode_png, order_layers, visible_crop
+from gerberdiff.compose import (
+    action_for_key,
+    compose_master,
+    decode_png,
+    order_layers,
+    visible_crop,
+)
 
 
 class _Pair:
@@ -83,6 +89,30 @@ def test_visible_crop_clamps_to_image_bounds():
 def test_visible_crop_accounts_for_pan():
     sx0, _sy0, _sx1, _sy1 = visible_crop(100, 100, 1.0, -50, 0, 40, 40)
     assert sx0 == 50  # the left 50px are panned off-screen
+
+
+def test_action_for_key_navigation_and_zoom():
+    assert action_for_key("Left") == "prev"
+    assert action_for_key("Up") == "prev"
+    assert action_for_key("Right") == "next"
+    assert action_for_key("space") == "next"
+    assert action_for_key("plus") == "zoom_in"
+    assert action_for_key("minus") == "zoom_out"
+    assert action_for_key("Home") == "fit"
+    assert action_for_key("0") == "fit"
+
+
+def test_action_for_key_digits_select_modes_in_order():
+    assert action_for_key("1") == "mode:overlay"
+    assert action_for_key("2") == "mode:a"
+    assert action_for_key("4") == "mode:split"
+    assert action_for_key("6") == "mode:onion"
+
+
+def test_action_for_key_unmapped_returns_none():
+    assert action_for_key("q") is None
+    assert action_for_key("7") is None
+    assert action_for_key("Escape") is None
 
 
 def test_viewer_module_imports():

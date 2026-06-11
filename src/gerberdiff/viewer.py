@@ -26,6 +26,7 @@ from .compose import (
     _MODE_LABELS,
     _MODES,
     _Layer,
+    action_for_key,
     compose_master,
     order_layers,
     visible_crop,
@@ -148,6 +149,9 @@ class DiffViewer(tk.Toplevel):
             c.bind("<Button-5>", self._zoom)  # X11 scroll down
             c.bind("<Double-Button-1>", lambda _e: self._fit_and_draw())
             c.bind("<Configure>", self._on_resize)
+
+        self.bind("<Key>", self._on_key)  # keyboard shortcuts (see action_for_key)
+        self.focus_set()
 
     def _tbtn(self, parent: tk.Widget, text: str, command) -> tk.Button:
         b = tk.Button(
@@ -304,6 +308,33 @@ class DiffViewer(tk.Toplevel):
         self.scale = new
         self._redraw()
 
+    def _zoom_keys(self, factor: float) -> None:
+        new = min(40.0, max(self._fit_scale, self.scale * factor))
+        if new == self.scale:
+            return
+        cx, cy = self.canvas.winfo_width() / 2, self.canvas.winfo_height() / 2
+        self.ox = cx - (cx - self.ox) * (new / self.scale)
+        self.oy = cy - (cy - self.oy) * (new / self.scale)
+        self.scale = new
+        self._redraw()
+
+    def _on_key(self, event: tk.Event) -> None:
+        action = action_for_key(event.keysym)
+        if action is None:
+            return
+        if action == "prev":
+            self._prev()
+        elif action == "next":
+            self._next()
+        elif action == "fit":
+            self._fit_and_draw()
+        elif action == "zoom_in":
+            self._zoom_keys(1.15)
+        elif action == "zoom_out":
+            self._zoom_keys(1 / 1.15)
+        elif action.startswith("mode:"):
+            self._set_mode(action[5:])
+
     def _pan_start(self, event: tk.Event) -> None:
         self._lx, self._ly = event.x, event.y
 
@@ -366,7 +397,7 @@ class DiffViewer(tk.Toplevel):
             bits.append("unchanged")
         if getattr(ld, "warning", None):
             bits.append(f"⚠ {ld.warning}")
-        bits.append("scroll = zoom · drag = pan · double-click = fit")
+        bits.append("←/→ layer · 1–6 modes · +/- or scroll zoom · drag pan · dbl-click fit")
         self.status_var.set("   ·   ".join(bits))
 
     def _open_report(self) -> None:

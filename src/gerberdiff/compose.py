@@ -80,6 +80,32 @@ def visible_crop(
     return sx0, sy0, sx1, sy1
 
 
+# digit keys "1".."6" select a mode, in _MODES order
+MODE_KEYS = {str(i + 1): mode for i, mode in enumerate(_MODES)}
+
+
+def action_for_key(keysym: str) -> str | None:
+    """Map a Tk keysym to a viewer action token, or None for no shortcut.
+
+    Pure so the keyboard scheme is unit-tested without a display; the Tk
+    DiffViewer just dispatches the token to its existing methods.
+    """
+    k = keysym.lower()
+    if k in ("left", "up", "prior"):
+        return "prev"
+    if k in ("right", "down", "next", "space"):
+        return "next"
+    if k in ("plus", "equal", "kp_add"):
+        return "zoom_in"
+    if k in ("minus", "underscore", "kp_subtract"):
+        return "zoom_out"
+    if k in ("0", "f", "home"):
+        return "fit"
+    if k in MODE_KEYS:
+        return "mode:" + MODE_KEYS[k]
+    return None
+
+
 class _Layer:
     """Decoded masters for one LayerDiff."""
 
