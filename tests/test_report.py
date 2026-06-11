@@ -115,3 +115,46 @@ def test_render_html_added_removed_tags_and_no_overlay():
     assert ">added</span>" in html
     assert ">removed</span>" in html
     assert "No overlay available" in html
+
+
+def test_render_html_is_well_formed():
+    from html.parser import HTMLParser
+
+    seen: list[tuple[str, str]] = []
+
+    class _P(HTMLParser):
+        def handle_starttag(self, tag, attrs):
+            seen.append(("start", tag))
+
+        def handle_endtag(self, tag):
+            seen.append(("end", tag))
+
+    _P().feed(render_html(_result([_layer("f_cu", added=5)])))  # must not raise
+    for tag in ("html", "head", "body", "table", "div", "footer"):
+        starts = sum(1 for kind, t in seen if kind == "start" and t == tag)
+        ends = sum(1 for kind, t in seen if kind == "end" and t == tag)
+        assert starts == ends, f"unbalanced <{tag}>: {starts} open vs {ends} close"
+
+
+def test_render_html_stats_and_no_footer_without_timestamp():
+    html = render_html(_result([_layer("f_cu", added=5)]))  # no generated_at
+    assert 'class="stat"' in html
+    assert "1 of 1 layers differ" in html
+    assert "Generated" not in html
+
+
+def test_render_json_layer_has_all_keys():
+    data = json.loads(render_json(_result([_layer("f_cu", added=1)])))
+    expected = {
+        "key",
+        "type",
+        "status",
+        "changed",
+        "added_pixels",
+        "removed_pixels",
+        "common_pixels",
+        "width",
+        "height",
+        "error",
+    }
+    assert set(data["layers"][0]) == expected

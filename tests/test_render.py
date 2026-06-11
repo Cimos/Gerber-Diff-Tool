@@ -62,3 +62,15 @@ def test_render_pair_aligned_same_size_for_diff():
     image_a, image_b = render_pair_aligned(a, b, dpmm=20)
     assert image_a is not None and image_b is not None
     assert image_a.size == image_b.size  # aligned onto the shared union frame
+
+
+def test_render_pair_identical_file_has_no_diff():
+    from gerberdiff.diff import diff_layer
+    from gerberdiff.models import LayerPair, PairStatus
+
+    a = FIXTURES / "revA" / "fixture-F_Cu.gbr"
+    image_a, image_b = render_pair_aligned(a, a, dpmm=20)
+    pair = LayerPair(key="x", layer_type="t", status=PairStatus.MATCHED, path_a=a, path_b=a)
+    diff = diff_layer(pair, image_a, image_b)
+    assert diff.changed_pixels == 0
+    assert diff.common_pixels > 0

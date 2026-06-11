@@ -1,8 +1,9 @@
 """Render a self-contained HTML diff report (all images embedded as base64).
 
-The output is a single file with no external assets, a colour legend, a summary
-table, and one card per layer (or PDF page). It supports light and dark themes:
-it follows the OS preference by default and offers a manual toggle.
+The output is a single file with no external assets: a header with summary
+stat cards, a colour legend, a per-item table, and one card per changed layer
+(or PDF page). It supports light and dark themes — it follows the OS preference
+by default and offers a manual toggle.
 """
 
 from __future__ import annotations
@@ -15,47 +16,69 @@ from .models import DiffResult, LayerDiff, PairStatus
 
 _CSS = """
 :root {
-  --bg: #ffffff; --fg: #1c1c1e; --muted: #6b6b70; --card: #f5f5f7;
-  --border: #d9d9de; --added: #1f9d3a; --removed: #d12f2f; --accent: #3b6ea5;
+  --bg: #f6f7f9; --panel: #ffffff; --fg: #1b2024; --muted: #687078;
+  --border: #e3e6ea; --row: #fafbfc; --hover: rgba(59,110,165,.08);
+  --added: #1f9d3a; --removed: #d12f2f; --accent: #3b6ea5;
+  --shadow: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.05);
 }
 :root[data-theme="dark"] {
-  --bg: #121214; --fg: #e6e6e8; --muted: #9a9aa0; --card: #1d1d20;
-  --border: #2c2c31; --added: #36c759; --removed: #ff5b52; --accent: #5b9bd5;
+  --bg: #121317; --panel: #1b1e24; --fg: #e7e9ee; --muted: #9aa0aa;
+  --border: #2a2e36; --row: #20242b; --hover: rgba(91,155,213,.12);
+  --added: #37c95a; --removed: #ff5b52; --accent: #5b9bd5;
+  --shadow: 0 1px 2px rgba(0,0,0,.4);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #121214; --fg: #e6e6e8; --muted: #9a9aa0; --card: #1d1d20;
-    --border: #2c2c31; --added: #36c759; --removed: #ff5b52; --accent: #5b9bd5;
+    --bg: #121317; --panel: #1b1e24; --fg: #e7e9ee; --muted: #9aa0aa;
+    --border: #2a2e36; --row: #20242b; --hover: rgba(91,155,213,.12);
+    --added: #37c95a; --removed: #ff5b52; --accent: #5b9bd5;
+    --shadow: 0 1px 2px rgba(0,0,0,.4);
   }
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--fg);
-  font: 15px/1.5 -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
-header { padding: 24px 28px; border-bottom: 1px solid var(--border);
-  display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
-h1 { font-size: 20px; margin: 0; }
-.meta { color: var(--muted); font-size: 13px; }
-main { padding: 24px 28px; max-width: 1100px; }
-.legend { display: flex; gap: 18px; margin: 8px 0 20px; flex-wrap: wrap; font-size: 13px; }
-.swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px;
-  margin-right: 6px; vertical-align: middle; }
-table { border-collapse: collapse; width: 100%; margin-bottom: 28px; font-size: 14px; }
-th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
-th { color: var(--muted); font-weight: 600; }
-.tag { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); }
-.tag.changed { color: var(--removed); border-color: var(--removed); }
-.tag.same { color: var(--muted); }
-.tag.added { color: var(--added); border-color: var(--added); }
-.tag.removed { color: var(--removed); border-color: var(--removed); }
-.card { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
-  padding: 16px; margin-bottom: 18px; }
-.card h3 { margin: 0 0 6px; font-size: 16px; }
-.card .sub { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
-.card img { max-width: 100%; height: auto; background: #000; border-radius: 6px;
-  image-rendering: pixelated; }
+  font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 30px 28px 64px; }
+header { display: flex; align-items: center; gap: 12px; }
+header h1 { font-size: 20px; font-weight: 700; margin: 0; letter-spacing: -.01em; }
+.summary { color: var(--muted); font-size: 13px; margin: 4px 0 20px; }
+button#theme-toggle { margin-left: auto; background: var(--panel); color: var(--fg);
+  border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; cursor: pointer;
+  font-size: 13px; box-shadow: var(--shadow); }
+button#theme-toggle:hover { border-color: var(--accent); }
+.stats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+.stat { background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px 18px; box-shadow: var(--shadow); min-width: 92px; }
+.stat .num { font-size: 24px; font-weight: 700; line-height: 1.1; }
+.stat .num.changed { color: var(--removed); }
+.stat .num.clean { color: var(--added); }
+.stat .lbl { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; margin-top: 2px; }
+.paths { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+code { font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace; font-size: 12.5px; }
+.legend { display: flex; gap: 18px; margin-bottom: 18px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.swatch { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 6px; vertical-align: middle; }
+table { width: 100%; border-collapse: separate; border-spacing: 0; background: var(--panel);
+  border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); margin-bottom: 28px; }
+th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+thead th { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); background: var(--row); font-weight: 600; }
+tbody tr:nth-child(even) { background: var(--row); }
+tbody tr:hover { background: var(--hover); }
+tbody tr:last-child td { border-bottom: none; }
+td.num { font-variant-numeric: tabular-nums; }
+.pill { font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
+  border: 1px solid var(--border); white-space: nowrap; }
+.pill.changed { color: var(--removed); border-color: var(--removed); }
+.pill.same { color: var(--muted); }
+.pill.added { color: var(--added); border-color: var(--added); }
+.pill.removed { color: var(--removed); border-color: var(--removed); }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+  padding: 18px; margin-bottom: 18px; box-shadow: var(--shadow); }
+.card h3 { margin: 0 0 4px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.card .sub { color: var(--muted); font-size: 12.5px; margin-bottom: 12px; }
+.card img { max-width: 100%; height: auto; background: #0c0d10; border: 1px solid var(--border);
+  border-radius: 8px; image-rendering: pixelated; display: block; }
 .err { color: var(--removed); }
-button { background: var(--card); color: var(--fg); border: 1px solid var(--border);
-  border-radius: 8px; padding: 6px 12px; cursor: pointer; font-size: 13px; margin-left: auto; }
+footer { color: var(--muted); font-size: 12px; margin-top: 8px; }
 """
 
 _TOGGLE_JS = """
@@ -75,7 +98,7 @@ _TOGGLE_JS = """
 """
 
 
-def _esc(text: str) -> str:
+def _esc(text: object) -> str:
     return html.escape(str(text))
 
 
@@ -83,17 +106,17 @@ def _b64_png(data: bytes) -> str:
     return base64.b64encode(data).decode("ascii")
 
 
-def _status_tag(layer: LayerDiff) -> str:
+def _status_pill(layer: LayerDiff) -> str:
     status = layer.pair.status
     if status is PairStatus.ADDED:
-        return '<span class="tag added">added</span>'
+        return '<span class="pill added">added</span>'
     if status is PairStatus.REMOVED:
-        return '<span class="tag removed">removed</span>'
+        return '<span class="pill removed">removed</span>'
     if layer.error:
-        return '<span class="tag changed">error</span>'
+        return '<span class="pill changed">error</span>'
     if layer.changed:
-        return '<span class="tag changed">changed</span>'
-    return '<span class="tag same">unchanged</span>'
+        return '<span class="pill changed">changed</span>'
+    return '<span class="pill same">unchanged</span>'
 
 
 def _summary_row(layer: LayerDiff) -> str:
@@ -103,10 +126,10 @@ def _summary_row(layer: LayerDiff) -> str:
         "<tr>"
         f"<td>{_esc(layer.pair.layer_type)}</td>"
         f"<td><code>{_esc(layer.pair.key)}</code></td>"
-        f"<td>{_status_tag(layer)}</td>"
-        f"<td>{layer.added_pixels:,}</td>"
-        f"<td>{layer.removed_pixels:,}</td>"
-        f"<td>{pct:.3f}%</td>"
+        f"<td>{_status_pill(layer)}</td>"
+        f'<td class="num">{layer.added_pixels:,}</td>'
+        f'<td class="num">{layer.removed_pixels:,}</td>'
+        f'<td class="num">{pct:.3f}%</td>'
         "</tr>"
     )
 
@@ -120,12 +143,16 @@ def _layer_card(layer: LayerDiff) -> str:
         body = '<p class="sub">No overlay available.</p>'
     return (
         '<div class="card">'
-        f"<h3>{_esc(layer.pair.layer_type)} {_status_tag(layer)}</h3>"
+        f"<h3>{_esc(layer.pair.layer_type)} {_status_pill(layer)}</h3>"
         f'<div class="sub"><code>{_esc(layer.pair.key)}</code> &middot; '
-        f"+{layer.added_pixels:,} / &minus;{layer.removed_pixels:,} px</div>"
+        f"+{layer.added_pixels:,} added / &minus;{layer.removed_pixels:,} removed px</div>"
         f"{body}"
         "</div>"
     )
+
+
+def _stat(num: str, label: str, cls: str = "") -> str:
+    return f'<div class="stat"><div class="num {cls}">{_esc(num)}</div><div class="lbl">{_esc(label)}</div></div>'
 
 
 def render_json(result: DiffResult) -> str:
@@ -160,19 +187,22 @@ def render_html(
     result: DiffResult, *, title: str = "Gerber Diff Report", generated_at: str | None = None
 ) -> str:
     changed = result.changed_layers
+    total = len(result.layers)
     subject = result.subject
     summary = (
-        f"{len(changed)} of {len(result.layers)} {subject}s differ"
-        if result.layers
-        else f"no {subject}s found"
+        f"{len(changed)} of {total} {subject}s differ" if result.layers else f"no {subject}s found"
     )
     rows = "\n".join(_summary_row(layer) for layer in result.layers)
     cards = "\n".join(_layer_card(layer) for layer in result.layers if layer.changed or layer.error)
     if not cards:
         cards = f'<p class="sub">No differences to show — every matched {subject} is identical.</p>'
 
-    meta_when = f" &middot; generated {_esc(generated_at)}" if generated_at else ""
-    resolution = f" &middot; {_esc(result.resolution)}" if result.resolution else ""
+    stats = (
+        _stat(str(len(changed)), "changed", "changed" if changed else "clean")
+        + _stat(str(total), subject + ("s" if total != 1 else ""))
+        + (_stat(result.resolution, "resolution") if result.resolution else "")
+    )
+    footer = f"Generated {_esc(generated_at)}" if generated_at else ""
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -183,13 +213,14 @@ def render_html(
 <style>{_CSS}</style>
 </head>
 <body>
-<header>
-  <h1>{_esc(title)}</h1>
-  <span class="meta">{_esc(summary)}{resolution}{meta_when}</span>
-  <button id="theme-toggle">Toggle theme</button>
-</header>
-<main>
-  <div class="meta">A (old): <code>{_esc(result.dir_a)}</code> &nbsp; &rarr; &nbsp;
+<div class="wrap">
+  <header>
+    <h1>{_esc(title)}</h1>
+    <button id="theme-toggle">Toggle theme</button>
+  </header>
+  <div class="summary">{_esc(summary)}</div>
+  <div class="stats">{stats}</div>
+  <div class="paths">A (old): <code>{_esc(result.dir_a)}</code> &nbsp;&rarr;&nbsp;
     B (new): <code>{_esc(result.dir_b)}</code></div>
   <div class="legend">
     <span><span class="swatch" style="background:var(--removed)"></span>removed (in A, not B)</span>
@@ -204,7 +235,8 @@ def render_html(
     </tbody>
   </table>
   {cards}
-</main>
+  <footer>{footer}</footer>
+</div>
 <script>{_TOGGLE_JS}</script>
 </body>
 </html>

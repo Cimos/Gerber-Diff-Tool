@@ -166,3 +166,31 @@ def test_invalid_dpi_exit_2(tmp_path: Path):
         ]
     )
     assert code == 2
+
+
+def test_cli_prints_summary(tmp_path: Path, capsys):
+    pytest.importorskip("pygerber")
+    main([str(FIXTURES / "revA"), str(FIXTURES / "revB"), "-o", str(tmp_path / "r.html"), "-q"])
+    out = capsys.readouterr().out
+    assert "Compared 2 layers" in out
+    assert "Top Copper" in out
+    assert "Report written to" in out
+
+
+def test_cli_default_output_path(tmp_path: Path, monkeypatch):
+    pytest.importorskip("pygerber")
+    monkeypatch.chdir(tmp_path)
+    code = main([str(FIXTURES / "revA"), str(FIXTURES / "revB"), "-q"])
+    assert code == 0
+    assert (tmp_path / "gerber-diff-report.html").exists()
+
+
+def test_python_m_entry_runs():
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [sys.executable, "-m", "gerberdiff", "--version"], capture_output=True, text=True
+    )
+    assert result.returncode == 0
+    assert "gdiff" in result.stdout

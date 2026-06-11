@@ -8,7 +8,7 @@ overlay, in a self-contained HTML report you can attach to a review or archive.
 It runs entirely on your machine — nothing is uploaded — and the same engine
 drives a command line you can wire into CI and a small desktop GUI.
 
-> Status: **early alpha (v0.2).** Gerber **and** schematic-PDF diff both work,
+> Status: **early alpha (v0.3).** Gerber **and** schematic-PDF diff both work,
 > via a CLI (`gdiff`) and a desktop GUI (`gdiff-gui`). A reusable GitHub Action
 > is on the roadmap below.
 
@@ -34,7 +34,7 @@ native viewer ([GrbDiff](https://github.com/dennevi/GrbDiff) over `gerbv`).
 None of them are FOSS *and* cover **Gerber + schematic** in one lightweight,
 cross-platform, scriptable package. That's the gap this fills.
 
-## Features (v0.2)
+## Features (v0.3)
 
 - Compare two folders of Gerber/drill files **or** two schematic PDFs — the mode
   is auto-detected.

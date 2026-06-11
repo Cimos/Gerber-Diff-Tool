@@ -88,3 +88,13 @@ def test_removed_page_when_a_has_more_pages(tmp_path: Path):
     diffs = diff_pdfs(a, b, dpi=72)
     assert len(diffs) == 2
     assert diffs[1].pair.status is PairStatus.REMOVED
+
+
+def test_threshold_affects_pdf_diff(tmp_path: Path):
+    a = tmp_path / "a.pdf"
+    b = tmp_path / "b.pdf"
+    _make_pdf(a, "REV", extra_box=False)
+    _make_pdf(b, "REV", extra_box=True)
+    lenient = diff_pdfs(a, b, dpi=100, threshold=5)[0]
+    strict = diff_pdfs(a, b, dpi=100, threshold=250)[0]
+    assert lenient.added_pixels >= strict.added_pixels

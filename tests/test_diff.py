@@ -113,3 +113,32 @@ def test_overlay_image_uses_expected_colours():
 
 def test_png_bytes_has_png_signature():
     assert png_bytes(Image.new("RGB", (2, 2)))[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_overlay_background_is_filled():
+    from gerberdiff.diff import COLOR_BACKGROUND
+
+    blank = np.zeros((2, 2), dtype=bool)
+    px = np.asarray(overlay_image(blank, blank, blank))
+    assert tuple(px[0, 0]) == COLOR_BACKGROUND
+
+
+def test_png_bytes_roundtrips_to_overlay_colour():
+    import io
+
+    img = overlay_image(np.array([[True]]), np.array([[False]]), np.array([[False]]))
+    reloaded = Image.open(io.BytesIO(png_bytes(img)))
+    assert reloaded.size == (1, 1)
+    assert tuple(np.asarray(reloaded.convert("RGB"))[0, 0]) == COLOR_ADDED
+
+
+def test_diff_layer_is_deterministic():
+    a = _image({(1, 1), (5, 5)})
+    b = _image({(1, 1), (8, 8)})
+    first = diff_layer(_pair(), a, b)
+    second = diff_layer(_pair(), a.copy(), b.copy())
+    assert first.overlay_png == second.overlay_png
+    assert (first.added_pixels, first.removed_pixels) == (
+        second.added_pixels,
+        second.removed_pixels,
+    )
