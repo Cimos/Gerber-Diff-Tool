@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 
+import pytest
 from PIL import Image
 
 from gerberdiff.compose import compose_master, decode_png, order_layers, visible_crop
@@ -85,4 +86,6 @@ def test_visible_crop_accounts_for_pan():
 
 
 def test_viewer_module_imports():
+    # viewer.py is the Tk shell; some headless CPython builds ship without tkinter.
+    pytest.importorskip("tkinter")
     import gerberdiff.viewer  # noqa: F401
