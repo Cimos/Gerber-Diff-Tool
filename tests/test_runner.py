@@ -80,6 +80,41 @@ def test_run_diff_rejects_mismatched_inputs(tmp_path: Path):
         run_diff(folder, pdf)
 
 
+def _zip_of(folder: Path, dest: Path, *, root: str | None = None) -> Path:
+    import zipfile
+
+    with zipfile.ZipFile(dest, "w") as archive:
+        for file in folder.iterdir():
+            arcname = f"{root}/{file.name}" if root else file.name
+            archive.write(file, arcname)
+    return dest
+
+
+def test_run_diff_zip_inputs(tmp_path: Path):
+    pytest.importorskip("pygerber")
+    zip_a = _zip_of(FIXTURES / "revA", tmp_path / "a.zip")
+    zip_b = _zip_of(FIXTURES / "revB", tmp_path / "b.zip")
+    result = run_diff(zip_a, zip_b, dpmm=20)
+    assert result.subject == "layer"
+    assert result.any_changes
+    assert result.dir_a == zip_a  # report shows the zip, not the temp dir
+
+
+def test_run_diff_mixed_zip_and_dir(tmp_path: Path):
+    pytest.importorskip("pygerber")
+    zip_a = _zip_of(FIXTURES / "revA", tmp_path / "a.zip")
+    result = run_diff(zip_a, FIXTURES / "revB", dpmm=20)
+    assert result.any_changes
+
+
+def test_run_diff_zip_with_single_root_folder(tmp_path: Path):
+    pytest.importorskip("pygerber")
+    zip_a = _zip_of(FIXTURES / "revA", tmp_path / "a.zip", root="gerbers")
+    zip_b = _zip_of(FIXTURES / "revB", tmp_path / "b.zip", root="gerbers")
+    result = run_diff(zip_a, zip_b, dpmm=20)
+    assert result.any_changes  # descended into the single top-level folder
+
+
 def test_run_diff_bad_gerber_becomes_error_layer(tmp_path: Path):
     pytest.importorskip("pygerber")
     a = tmp_path / "a"

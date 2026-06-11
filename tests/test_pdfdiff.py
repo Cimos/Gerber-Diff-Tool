@@ -77,7 +77,8 @@ def test_added_page_when_b_has_more_pages(tmp_path: Path):
     diffs = diff_pdfs(a, b, dpi=72)
     assert len(diffs) == 2
     assert diffs[1].pair.status is PairStatus.ADDED
-    assert diffs[1].pair.key == "page-2"
+    assert diffs[1].pair.key == "page-b2"
+    assert "(new)" in diffs[1].pair.layer_type
 
 
 def test_removed_page_when_a_has_more_pages(tmp_path: Path):
@@ -88,6 +89,39 @@ def test_removed_page_when_a_has_more_pages(tmp_path: Path):
     diffs = diff_pdfs(a, b, dpi=72)
     assert len(diffs) == 2
     assert diffs[1].pair.status is PairStatus.REMOVED
+    assert "(old)" in diffs[1].pair.layer_type
+
+
+def test_pair_pages_insertion_does_not_offset_later_pages():
+    """The audit's failure case: a sheet inserted at the front must not make
+    every later page report as changed."""
+    from gerberdiff.pdfdiff import pair_pages
+
+    a = ["sheet power", "sheet mcu", "sheet io"]
+    b = ["sheet new cover", "sheet power", "sheet mcu", "sheet io"]
+    assert pair_pages(a, b) == [(None, 0), (0, 1), (1, 2), (2, 3)]
+
+
+def test_pair_pages_removal_and_changed_page():
+    from gerberdiff.pdfdiff import pair_pages
+
+    # page 1 edited (still pairs), page 2 removed
+    a = ["alpha rev1", "beta"]
+    b = ["alpha rev2"]
+    assert pair_pages(a, b) == [(0, 0), (1, None)]
+
+
+def test_pair_pages_textless_falls_back_to_order():
+    from gerberdiff.pdfdiff import pair_pages
+
+    assert pair_pages(["", ""], ["", "", ""]) == [(0, 0), (1, 1), (None, 2)]
+
+
+def test_pair_pages_shift_label():
+    from gerberdiff.pdfdiff import _pair_label
+
+    assert _pair_label(2, 3) == ("page-3-4", "Page 3 → 4")
+    assert _pair_label(1, 1) == ("page-2", "Page 2")
 
 
 def test_diff_pdfs_reports_progress(tmp_path: Path):

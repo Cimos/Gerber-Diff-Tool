@@ -8,7 +8,7 @@ overlay, in a self-contained HTML report you can attach to a review or archive.
 It runs entirely on your machine — nothing is uploaded — and the same engine
 drives a command line you can wire into CI and a small desktop GUI.
 
-> Status: **early alpha (v0.6).** Gerber **and** schematic-PDF diff both work,
+> Status: **early alpha (v0.7).** Gerber **and** schematic-PDF diff both work,
 > via a CLI (`gdiff`), a desktop GUI (`gdiff-gui`), and a reusable GitHub
 > Action that comments the diff on pull requests.
 
@@ -34,10 +34,13 @@ native viewer ([GrbDiff](https://github.com/dennevi/GrbDiff) over `gerbv`).
 None of them are FOSS *and* cover **Gerber + schematic** in one lightweight,
 cross-platform, scriptable package. That's the gap this fills.
 
-## Features (v0.6)
+## Features (v0.7)
 
-- Compare two folders of Gerber/drill files **or** two schematic PDFs — the mode
-  is auto-detected.
+- Compare two folders **or zip archives** of Gerber/drill files (fab packages
+  work as-is), or two schematic PDFs — the mode is auto-detected.
+- PDF pages pair by **text content**, so an inserted or removed schematic sheet
+  no longer makes every later page report as changed (order-based fallback for
+  scanned PDFs).
 - Automatic layer detection and pairing via
   [`gerbonara`](https://gitlab.com/gerbolyze/gerbonara)'s `LayerStack`: layers
   pair by *identity* (top copper, bottom mask, …), so pairing survives a board
@@ -66,7 +69,7 @@ cross-platform, scriptable package. That's the gap this fills.
 ### Roadmap
 
 - Structural (net-level) schematic diff, beyond pixel diff.
-- Smarter PDF page pairing (by sheet title rather than index).
+- Parallel layer rendering for large boards.
 
 ## Install
 

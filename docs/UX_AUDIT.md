@@ -13,6 +13,9 @@
 > Action (report artifact + step summary + create-or-update PR comment, with a
 > CI self-test job), git-ref inputs (`gdiff v1.0 HEAD --git gerbers/`), a
 > `--summary-md` output, and the PDF index-pairing expectation note.
+> **v0.7.0**: zip-archive inputs (fab packages diff without manual extraction)
+> and content-based PDF page pairing — an inserted sheet no longer cascades
+> into false "changed" reports (resolves the P3-era low-severity finding #9).
 
 ## Method
 

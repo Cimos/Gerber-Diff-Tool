@@ -30,14 +30,14 @@ def build_parser() -> argparse.ArgumentParser:
         "old",
         type=Path,
         metavar="OLD",
-        help="revision A: a folder of Gerber/drill files, a schematic .pdf, "
+        help="revision A: a folder or .zip of Gerber/drill files, a schematic .pdf, "
         "or a git ref when --git is given",
     )
     parser.add_argument(
         "new",
         type=Path,
         metavar="NEW",
-        help="revision B: a folder of Gerber/drill files, a schematic .pdf, "
+        help="revision B: a folder or .zip of Gerber/drill files, a schematic .pdf, "
         "or a git ref when --git is given",
     )
     parser.add_argument(

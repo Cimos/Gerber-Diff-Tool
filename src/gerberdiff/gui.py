@@ -135,7 +135,9 @@ class App:
         self.dpmm_var = tk.StringVar(value=str(self._cfg.get("dpmm", 20)))
         self.dpi_var = tk.StringVar(value=str(self._cfg.get("dpi", 150)))
         self.threshold_var = tk.StringVar(value=str(self._cfg.get("threshold", 10)))
-        self.mode_var = tk.StringVar(value="Choose two folders of Gerbers, or two schematic PDFs.")
+        self.mode_var = tk.StringVar(
+            value="Choose two folders/zips of Gerbers, or two schematic PDFs."
+        )
         self.status_var = tk.StringVar(value="Ready — pick Revision A and B, then Compare.")
         self._last_report: Path | None = None
         self._first_field: tk.Entry | None = None
@@ -293,7 +295,7 @@ class App:
         self._button(card, "Folder…", lambda: self._browse_folder(var, sibling)).grid(
             row=index, column=2, sticky="ew", padx=8, pady=(top, 6)
         )
-        self._button(card, "PDF…", lambda: self._browse_pdf(var)).grid(
+        self._button(card, "File…", lambda: self._browse_pdf(var)).grid(
             row=index, column=3, sticky="ew", padx=(0, 14), pady=(top, 6)
         )
         return entry
@@ -316,10 +318,12 @@ class App:
         b = self.new_var.get().strip().lower()
         if a.endswith(".pdf") and b.endswith(".pdf"):
             self.mode_var.set("Mode: schematic PDF — compared page by page")
+        elif a and b and (a.endswith(".zip") or b.endswith(".zip")):
+            self.mode_var.set("Mode: Gerber zip — extracted and compared layer by layer")
         elif a and b:
             self.mode_var.set("Mode: Gerber folders — compared layer by layer")
         else:
-            self.mode_var.set("Choose two folders of Gerbers, or two schematic PDFs.")
+            self.mode_var.set("Choose two folders/zips of Gerbers, or two schematic PDFs.")
 
     def _browse_folder(self, var: tk.StringVar, sibling: tk.StringVar | None) -> None:
         initial = self._last_dir
@@ -332,9 +336,14 @@ class App:
 
     def _browse_pdf(self, var: tk.StringVar) -> None:
         path = filedialog.askopenfilename(
-            title="Choose a schematic PDF",
+            title="Choose a schematic PDF or a zip of Gerbers",
             initialdir=self._last_dir,
-            filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
+            filetypes=[
+                ("PDF or Gerber zip", "*.pdf;*.zip"),
+                ("PDF files", "*.pdf"),
+                ("Zip archives", "*.zip"),
+                ("All files", "*.*"),
+            ],
         )
         if path:
             var.set(path)

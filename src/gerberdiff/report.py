@@ -365,8 +365,8 @@ def render_html(
         + (_stat(result.resolution, "resolution") if result.resolution else "")
     )
     pairing_note = (
-        "<br><span>Note: PDF pages are paired by index — an inserted or removed page "
-        "offsets every later comparison.</span>"
+        "<br><span>Note: PDF pages are paired by text content (falling back to page "
+        "order for pages without a text layer).</span>"
         if subject == "page"
         else ""
     )

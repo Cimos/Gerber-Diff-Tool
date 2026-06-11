@@ -87,7 +87,9 @@ def bbox_of(mask: np.ndarray) -> tuple[int, int, int, int] | None:
 
 def png_bytes(image: Image.Image) -> bytes:
     buffer = io.BytesIO()
-    image.save(buffer, format="PNG")
+    # optimize=True shrinks the flat-colour overlays noticeably; reports embed
+    # several of these as base64, so it directly cuts report size.
+    image.save(buffer, format="PNG", optimize=True)
     return buffer.getvalue()
 
 
