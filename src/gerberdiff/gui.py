@@ -43,6 +43,7 @@ from .theme import (  # noqa: F401 - shared dark-theme palette tokens
     _SUCCESS,
     _SURFACE,
     _TEXT,
+    app_icon_path,
 )
 
 _CONFIG_PATH = Path.home() / ".gerber-diff.json"
@@ -115,6 +116,12 @@ class App:
         root.title("gerber-diff")
         root.configure(bg=_BG)
         root.minsize(600, 0)
+        _ico = app_icon_path()
+        if _ico is not None:
+            try:
+                root.iconbitmap(default=str(_ico))
+            except tk.TclError:
+                pass
         self._cfg = _load_config()
 
         families = set(tkfont.families(root))
@@ -445,7 +452,57 @@ class App:
             webbrowser.open(self._last_report.resolve().as_uri())
 
 
-def main() -> int:
+def _selftest(report_path: str | None = None) -> int:
+    """Headless end-to-end check that the (possibly frozen) renderers work.
+
+    Exercises pygerber + gerbonara (Gerber path) and pypdfium2 (PDF path), so a
+    packaged build can be verified before relying on it:
+    ``GerberDiff.exe --selftest``.
+    """
+    import tempfile
+    from pathlib import Path as _Path
+
+    from .runner import run_diff
+
+    msg = "OK"
+    try:
+        gerber = "G04*\n%FSLAX46Y46*%\n%MOMM*%\n%ADD10C,1.0*%\nD10*\nX1000000Y1000000D03*\nM02*\n"
+        with tempfile.TemporaryDirectory() as td:
+            a, b = _Path(td) / "a", _Path(td) / "b"
+            a.mkdir()
+            b.mkdir()
+            for d in (a, b):
+                (d / "x-F_Cu.gbr").write_text(gerber)
+                (d / "x-B_Cu.gbr").write_text(gerber)
+            assert run_diff(a, b, dpmm=10).layers, "gerber path produced no layers"
+
+            from PIL import Image, ImageDraw
+
+            pa, pb = _Path(td) / "a.pdf", _Path(td) / "b.pdf"
+            for p, extra in ((pa, False), (pb, True)):
+                im = Image.new("1", (120, 80), 1)
+                draw = ImageDraw.Draw(im)
+                draw.rectangle([10, 10, 80, 60], outline=0, width=3)
+                if extra:
+                    draw.line([90, 10, 110, 60], fill=0, width=3)
+                im.save(str(p))
+            assert run_diff(pa, pb, dpi=72).layers, "pdf path produced no pages"
+    except Exception as exc:  # noqa: BLE001 - any failure becomes the test result
+        msg = f"FAIL: {type(exc).__name__}: {exc}"
+    if report_path:
+        try:
+            _Path(report_path).write_text(msg, encoding="utf-8")
+        except OSError:
+            pass
+    if sys.stdout is not None:  # windowed PyInstaller builds have no stdout
+        print(msg)
+    return 0 if msg == "OK" else 1
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = list(sys.argv[1:] if argv is None else argv)
+    if args and args[0] == "--selftest":
+        return _selftest(args[1] if len(args) > 1 else None)
     if not _TK_AVAILABLE:
         print(
             "gdiff-gui needs tkinter, which this Python build doesn't include.\n"

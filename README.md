@@ -84,7 +84,21 @@ cross-platform, scriptable package. That's the gap this fills.
 
 - Structural (net-level) schematic diff, beyond pixel diff.
 
-## Install
+## Download (Windows app — no Python needed)
+
+Grab the latest build from the [**Releases**](https://github.com/Cimos/Gerber-Diff-Tool/releases)
+page — nothing else to install:
+
+- **`GerberDiffSetup.exe`** — installer; adds a Start-menu (and optional desktop)
+  shortcut. Recommended for most people.
+- **`GerberDiff-portable.exe`** — single self-contained file; runs from anywhere,
+  no install. Handy on a locked-down machine or a USB stick.
+
+It is unsigned hobby software, so Windows SmartScreen shows *"Windows protected
+your PC / unknown publisher"* on first run — click **More info → Run anyway**.
+To confirm a build is intact, run `GerberDiff.exe --selftest` (prints `OK`).
+
+## Install (from source)
 
 The project uses [`uv`](https://docs.astral.sh/uv/) for development, but it is a
 standard `pyproject.toml` project, so plain `pip` works too.
@@ -185,6 +199,18 @@ uv run ruff check . && uv run ruff format --check .
 
 CI runs ruff (lint + format) and the test suite with a coverage gate on
 Ubuntu / Windows / macOS × Python 3.12 / 3.13 (see `.github/workflows/ci.yml`).
+
+### Building the Windows app
+
+```bash
+uv sync --extra build
+uv run pyinstaller GerberDiff.spec --noconfirm   # -> dist/GerberDiff/GerberDiff.exe
+dist\GerberDiff\GerberDiff.exe --selftest        # prints OK if the bundle is intact
+```
+
+Pushing a `v*` tag triggers `.github/workflows/release.yml`, which builds the
+one-folder app, compiles the Inno Setup installer (`GerberDiffSetup.iss`) and a
+portable one-file exe, and attaches both to a GitHub Release.
 
 ## Support
 

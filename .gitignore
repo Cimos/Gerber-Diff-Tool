@@ -24,6 +24,12 @@ uv.lock.bak
 *.report.html
 report_assets/
 
+# Packaging scratch (the committed recipe is GerberDiff.spec / GerberDiffSetup.iss)
+/Output/
+/GDiffDebug.spec
+/selftest.txt
+/dbg.txt
+
 # OS / editor
 .DS_Store
 Thumbs.db

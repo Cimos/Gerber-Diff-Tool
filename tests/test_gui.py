@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 import gerberdiff.gui as gui
 
 
@@ -16,6 +18,16 @@ def test_gui_main_without_tk_is_graceful(monkeypatch, capsys):
     code = gui.main()
     assert code == 1
     assert "tkinter" in capsys.readouterr().err.lower()
+
+
+def test_selftest_passes(tmp_path):
+    # Same check the frozen app runs via `GerberDiff.exe --selftest`: exercises
+    # the real pygerber + pypdfium2 renderers end to end, no display needed.
+    pytest.importorskip("pygerber")
+    pytest.importorskip("pypdfium2")
+    report = tmp_path / "selftest.txt"
+    assert gui.main(["--selftest", str(report)]) == 0
+    assert report.read_text(encoding="utf-8").strip() == "OK"
 
 
 def test_parse_int_field():

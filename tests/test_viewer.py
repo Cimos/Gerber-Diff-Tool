@@ -6,7 +6,7 @@ import io
 
 from PIL import Image
 
-from gerberdiff.viewer import compose_master, decode_png, order_layers, visible_crop
+from gerberdiff.compose import compose_master, decode_png, order_layers, visible_crop
 
 
 class _Pair:

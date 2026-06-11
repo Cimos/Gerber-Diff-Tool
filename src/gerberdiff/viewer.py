@@ -6,104 +6,30 @@ reviewer drives: pick a layer (changed first), choose a comparison mode
 done in Pillow; the canvas only ever rasterizes the visible crop at the current
 zoom, so it stays smooth on large boards.
 
-The pure helpers (``order_layers``, ``compose_master``, ``visible_crop``) carry
-the logic and are unit-tested without a display. ``DiffViewer`` is a Tk
-``Toplevel`` opened by the GUI after a compare.
+The pure helpers live in ``compose.py`` (Tk-free, unit-tested without a
+display); ``DiffViewer`` here is the Tk ``Toplevel`` shell the GUI opens after a
+compare.
 """
 
 from __future__ import annotations
 
 import tkinter as tk
 import webbrowser
-from io import BytesIO
 from pathlib import Path
 from tkinter import ttk
 
 from PIL import Image, ImageTk
 
 from . import theme as T
-
-_MODES = ("overlay", "a", "b", "split", "swipe", "onion")
-_MODE_LABELS = {
-    "overlay": "Overlay",
-    "a": "A (old)",
-    "b": "B (new)",
-    "split": "Split",
-    "swipe": "Swipe",
-    "onion": "Onion",
-}
-_BOTH_ONLY = {"split", "swipe", "onion"}  # need both A and B rasters
-
-
-# --- pure helpers (no Tk; unit-tested) -----------------------------------
-def order_layers(layers: list) -> list:
-    """Changed first, biggest change first, then unchanged."""
-    return sorted(layers, key=lambda lyr: (not lyr.changed, -lyr.changed_pixels))
-
-
-def decode_png(data: bytes | None) -> Image.Image | None:
-    if not data:
-        return None
-    img = Image.open(BytesIO(data))
-    img.load()
-    return img.convert("RGB")
-
-
-def compose_master(
-    mode: str,
-    overlay: Image.Image | None,
-    image_a: Image.Image | None,
-    image_b: Image.Image | None,
-    *,
-    swipe: float = 0.5,
-    alpha: float = 0.5,
-) -> Image.Image | None:
-    """Composite the single image shown on the primary canvas for *mode*.
-
-    Split shows A here and B on the secondary canvas. Modes needing both sides
-    fall back to the overlay when a side is missing.
-    """
-    if mode == "a":
-        return image_a or overlay
-    if mode in ("b",):
-        return image_b or overlay
-    if mode == "split":
-        return image_a or overlay
-    if mode == "onion" and image_a and image_b:
-        return Image.blend(image_a, image_b, max(0.0, min(1.0, alpha)))
-    if mode == "swipe" and image_a and image_b:
-        width, height = image_b.size
-        cut = max(0, min(width, round(swipe * width)))
-        out = image_b.copy()
-        if cut:
-            out.paste(image_a.crop((0, 0, cut, height)), (0, 0))
-        return out
-    return overlay
-
-
-def visible_crop(
-    mw: int, mh: int, scale: float, ox: float, oy: float, vw: int, vh: int
-) -> tuple[int, int, int, int]:
-    """Source rect (in master px) of the master currently visible in the canvas."""
-    sx0 = max(0, int(-ox / scale))
-    sy0 = max(0, int(-oy / scale))
-    sx1 = min(mw, int((vw - ox) / scale) + 1)
-    sy1 = min(mh, int((vh - oy) / scale) + 1)
-    return sx0, sy0, sx1, sy1
-
-
-class _Layer:
-    """Decoded masters for one LayerDiff."""
-
-    def __init__(self, ld) -> None:
-        self.ld = ld
-        self.overlay = decode_png(ld.overlay_png)
-        self.a = decode_png(getattr(ld, "image_a_png", None))
-        self.b = decode_png(getattr(ld, "image_b_png", None))
-
-    @property
-    def has_both(self) -> bool:
-        return self.a is not None and self.b is not None
+from .compose import (
+    _BOTH_ONLY,
+    _MODE_LABELS,
+    _MODES,
+    _Layer,
+    compose_master,
+    order_layers,
+    visible_crop,
+)
 
 
 class DiffViewer(tk.Toplevel):
@@ -134,9 +60,9 @@ class DiffViewer(tk.Toplevel):
             self._select(0)
 
     def _set_icon(self) -> None:
-        ico = Path(__file__).resolve().parent.parent.parent / "branding" / "app.ico"
+        ico = T.app_icon_path()
         try:
-            if ico.exists():
+            if ico is not None:
                 self.iconbitmap(default=str(ico))
         except tk.TclError:
             pass  # non-Windows or no Tk image support — cosmetic only

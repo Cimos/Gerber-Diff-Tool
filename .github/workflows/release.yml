@@ -1,0 +1,65 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write  # create the GitHub Release and attach artifacts
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install dependencies + PyInstaller
+        run: uv sync --extra build
+
+      - name: Build one-folder app
+        run: uv run pyinstaller GerberDiff.spec --noconfirm
+
+      - name: Self-test the frozen app
+        shell: pwsh
+        run: |
+          Start-Process -FilePath dist\GerberDiff\GerberDiff.exe -ArgumentList '--selftest','selftest.txt' -Wait
+          $r = (Get-Content selftest.txt -Raw).Trim()
+          Write-Host "selftest: $r"
+          if ($r -ne 'OK') { exit 1 }
+
+      - name: Build portable one-file exe
+        run: >
+          uv run pyinstaller --name GerberDiff-portable --windowed --onefile
+          --paths src --collect-all pypdfium2 --collect-all pypdfium2_raw
+          --collect-all pygerber --collect-data gerbonara
+          --collect-submodules pyparsing --collect-submodules gerberdiff
+          --add-data "branding/app.ico;branding"
+          --icon branding/app.ico --noconfirm app_entry.py
+
+      - name: Compile installer (Inno Setup)
+        shell: pwsh
+        run: >
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          /DMyAppVersion=${{ github.ref_name }} GerberDiffSetup.iss
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            Output/GerberDiffSetup.exe
+            dist/GerberDiff-portable.exe
+          body: |
+            Standalone Windows build of gerber-diff ${{ github.ref_name }}.
+
+            - **GerberDiffSetup.exe** — installer (Start-menu shortcut). Recommended.
+            - **GerberDiff-portable.exe** — single-file portable build.
+
+            Unsigned hobby software: Windows SmartScreen will say "unknown
+            publisher" — click **More info → Run anyway**. Verify a build with
+            `GerberDiff.exe --selftest`.

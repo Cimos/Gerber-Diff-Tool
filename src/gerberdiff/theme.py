@@ -7,6 +7,9 @@ darker still, so contrast improves on interaction. Colours match the brand mark
 
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
 _BG = "#16181d"
 _SURFACE = "#1e2128"
 _FIELD = "#262a33"
@@ -21,3 +24,12 @@ _DANGER = "#ff6b61"
 _ON_ACCENT = "#ffffff"
 _ADDED = "#2f6fe0"  # revision B added geometry (blue)
 _REMOVED = "#e07b2d"  # revision A removed geometry (orange)
+
+
+def app_icon_path() -> Path | None:
+    """Locate branding/app.ico in dev *and* in a PyInstaller-frozen build."""
+    candidates = []
+    if hasattr(sys, "_MEIPASS"):  # frozen: data bundled under _internal/
+        candidates.append(Path(sys._MEIPASS) / "branding" / "app.ico")
+    candidates.append(Path(__file__).resolve().parent.parent.parent / "branding" / "app.ico")
+    return next((p for p in candidates if p.exists()), None)
