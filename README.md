@@ -69,8 +69,9 @@ cross-platform, scriptable package. That's the gap this fills.
   overlay), lead-with-the-answer table (changed-first, "only changed" filter,
   jump links), light/dark theme.
 - A **native desktop viewer** (`gdiff-gui`): layer-by-layer (changed first) with
-  overlay / A / B / split / swipe / onion and pan-zoom — plus a CLI (`gdiff`,
-  also `python -m gerberdiff`).
+  overlay / A / B / split / swipe / onion and pan-zoom, fully keyboard-driven
+  (←/→ layers · `1`–`6` modes · `+`/`-` zoom · `Home` fit · `Esc` close) — plus a
+  CLI (`gdiff`, also `python -m gerberdiff`).
 - `--fail-on-diff` exit code, `--json` machine-readable summary, and
   `--summary-md` Markdown summary for CI.
 - **Git-native**: `gdiff v1.0 HEAD --git gerbers/` diffs a directory as it

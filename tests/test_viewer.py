@@ -100,6 +100,7 @@ def test_action_for_key_navigation_and_zoom():
     assert action_for_key("minus") == "zoom_out"
     assert action_for_key("Home") == "fit"
     assert action_for_key("0") == "fit"
+    assert action_for_key("Escape") == "close"
 
 
 def test_action_for_key_digits_select_modes_in_order():
@@ -112,7 +113,7 @@ def test_action_for_key_digits_select_modes_in_order():
 def test_action_for_key_unmapped_returns_none():
     assert action_for_key("q") is None
     assert action_for_key("7") is None
-    assert action_for_key("Escape") is None
+    assert action_for_key("Tab") is None
 
 
 def test_viewer_module_imports():

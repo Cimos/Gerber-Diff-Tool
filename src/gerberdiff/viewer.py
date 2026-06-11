@@ -322,6 +322,9 @@ class DiffViewer(tk.Toplevel):
         action = action_for_key(event.keysym)
         if action is None:
             return
+        if action == "close":
+            self.destroy()
+            return
         if action == "prev":
             self._prev()
         elif action == "next":

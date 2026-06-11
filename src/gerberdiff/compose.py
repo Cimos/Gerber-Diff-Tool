@@ -101,6 +101,8 @@ def action_for_key(keysym: str) -> str | None:
         return "zoom_out"
     if k in ("0", "f", "home"):
         return "fit"
+    if k == "escape":
+        return "close"
     if k in MODE_KEYS:
         return "mode:" + MODE_KEYS[k]
     return None
