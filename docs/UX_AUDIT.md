@@ -8,7 +8,8 @@
 > Compare button + keyboard operability, report swipe/onion/zoom viewer with
 > lead-with-the-answer table (changed-first + "only changed" filter + jump links),
 > live progress + empty/error states, setup memory, report a11y semantics, and
-> documentation-layer classification. **P3 remains** (GitHub Action, git-ref inputs).
+> documentation-layer classification. **v0.5.0** adds the Split (side-by-side)
+> view with synchronized pan/zoom. **P3 remains** (GitHub Action, git-ref inputs).
 
 ## Method
 

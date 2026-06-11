@@ -19,6 +19,8 @@ def _layer(
     error: str | None = None,
     overlay: bytes | None = b"PNGDATA",
     layer_type: str = "Top Copper",
+    image_a: bytes | None = None,
+    image_b: bytes | None = None,
 ) -> LayerDiff:
     return LayerDiff(
         pair=LayerPair(
@@ -30,6 +32,8 @@ def _layer(
         removed_pixels=removed,
         common_pixels=common,
         overlay_png=overlay,
+        image_a_png=image_a,
+        image_b_png=image_b,
         error=error,
     )
 
@@ -115,6 +119,21 @@ def test_render_html_added_removed_tags_and_no_overlay():
     assert ">added</span>" in html
     assert ">removed</span>" in html
     assert "No overlay available" in html
+
+
+def test_viewer_split_and_swipe_require_both_sides():
+    html = render_html(_result([_layer("f_cu", added=1, image_a=b"A", image_b=b"B")]))
+    assert 'data-mode="split"' in html
+    assert 'data-mode="swipe"' in html
+    assert 'class="stage s2"' in html  # second synchronized stage for Split
+
+
+def test_viewer_one_sided_layer_has_no_split():
+    html = render_html(_result([_layer("f_mask", status=PairStatus.ADDED, added=1, image_b=b"B")]))
+    assert 'data-mode="split"' not in html
+    assert 'data-mode="swipe"' not in html
+    assert 'class="stage s2"' not in html
+    assert 'data-mode="b"' in html  # B-only view still offered
 
 
 def test_render_html_is_well_formed():

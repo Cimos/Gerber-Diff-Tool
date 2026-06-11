@@ -86,9 +86,16 @@ table.hide-unchanged tr.unchanged { display:none; }
 .viewer .vtoolbar button[aria-pressed="true"] { background:var(--accent); color:#fff; border-color:var(--accent); }
 .viewer .slider { flex:1; min-width:120px; max-width:300px; accent-color:var(--accent); }
 .viewer .hint { color:var(--muted); font-size:11.5px; }
+.stages { display:flex; gap:8px; }
+.stages .stage { flex:1; min-width:0; }
 .stage { position:relative; overflow:hidden; background:#0c0d10; border:1px solid var(--border);
   border-radius:8px; cursor:grab; }
 .stage.grabbing { cursor:grabbing; }
+.stage[hidden] { display:none; }
+.stage.s2 .pan img.ib { position:static; }
+.stage[data-label]::after { content:attr(data-label); position:absolute; top:6px; left:6px;
+  background:rgba(12,13,16,.78); color:#e7e9ee; font-size:11px; padding:2px 8px;
+  border-radius:6px; pointer-events:none; z-index:1; }
 .pan { transform-origin:0 0; }
 .pan img { display:block; width:100%; height:auto; image-rendering:pixelated; }
 .pan img.ia, .pan img.ib { position:absolute; top:0; left:0; }
@@ -116,21 +123,35 @@ _JS = """
   if (flt) { flt.addEventListener('change', applyFilter); applyFilter(); }
 
   document.querySelectorAll('.viewer').forEach(function (v) {
-    var pan = v.querySelector('.pan'), stage = v.querySelector('.stage'), slider = v.querySelector('.slider');
+    var stages = Array.prototype.slice.call(v.querySelectorAll('.stage'));
+    var pans = stages.map(function (s) { return s.querySelector('.pan'); });
+    var stageB = v.querySelector('.stage.s2');
+    var panB = stageB ? stageB.querySelector('.pan') : null;
+    var slider = v.querySelector('.slider');
     var ov = v.querySelector('.ov'), a = v.querySelector('.ia'), b = v.querySelector('.ib');
     var mode = 'overlay', scale = 1, tx = 0, ty = 0;
     function render() {
       var s = +slider.value;
+      var split = mode === 'split';
+      if (stageB) {
+        stageB.hidden = !split;
+        // Split reuses the embedded B image by moving the node — no duplication.
+        if (split && b && panB && b.parentNode !== panB) panB.appendChild(b);
+        if (!split && b && b.parentNode !== pans[0]) pans[0].appendChild(b);
+        if (split) { stages[0].dataset.label = 'A (old)'; stageB.dataset.label = 'B (new)'; }
+        else { delete stages[0].dataset.label; delete stageB.dataset.label; }
+      }
       if (ov) ov.style.opacity = mode === 'overlay' ? 1 : 0;
-      if (b) b.style.opacity = (mode === 'b' || mode === 'swipe' || mode === 'onion') ? 1 : 0;
+      if (b) b.style.opacity = (mode === 'b' || mode === 'swipe' || mode === 'onion' || split) ? 1 : 0;
       if (a) {
-        if (mode === 'a') { a.style.opacity = 1; a.style.clipPath = 'none'; }
+        if (mode === 'a' || split) { a.style.opacity = 1; a.style.clipPath = 'none'; }
         else if (mode === 'swipe') { a.style.opacity = 1; a.style.clipPath = 'inset(0 ' + (100 - s) + '% 0 0)'; }
         else if (mode === 'onion') { a.style.opacity = s / 100; a.style.clipPath = 'none'; }
         else { a.style.opacity = 0; a.style.clipPath = 'none'; }
       }
       slider.style.display = (mode === 'swipe' || mode === 'onion') ? '' : 'none';
-      pan.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')';
+      var t = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')';
+      pans.forEach(function (p) { if (p) p.style.transform = t; });  // stages stay in sync
     }
     v.querySelectorAll('[data-mode]').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -140,26 +161,28 @@ _JS = """
       });
     });
     slider.addEventListener('input', render);
-    stage.addEventListener('wheel', function (e) {
-      e.preventDefault();
-      scale = Math.min(20, Math.max(1, scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
-      if (scale === 1) { tx = 0; ty = 0; }
-      render();
-    }, { passive: false });
-    var drag = false, lx = 0, ly = 0;
-    stage.addEventListener('mousedown', function (e) { drag = true; lx = e.clientX; ly = e.clientY; stage.classList.add('grabbing'); });
-    window.addEventListener('mousemove', function (e) { if (!drag) return; tx += e.clientX - lx; ty += e.clientY - ly; lx = e.clientX; ly = e.clientY; render(); });
-    window.addEventListener('mouseup', function () { drag = false; stage.classList.remove('grabbing'); });
-    stage.addEventListener('dblclick', function () { scale = 1; tx = 0; ty = 0; render(); });
-    stage.addEventListener('keydown', function (e) {
-      var step = 30 / scale;
-      if (e.key === '+' || e.key === '=') scale = Math.min(20, scale * 1.15);
-      else if (e.key === '-') scale = Math.max(1, scale / 1.15);
-      else if (e.key === 'ArrowLeft') tx += step; else if (e.key === 'ArrowRight') tx -= step;
-      else if (e.key === 'ArrowUp') ty += step; else if (e.key === 'ArrowDown') ty -= step;
-      else if (e.key === '0') { scale = 1; tx = 0; ty = 0; }
-      else return;
-      e.preventDefault(); render();
+    stages.forEach(function (stage) {
+      stage.addEventListener('wheel', function (e) {
+        e.preventDefault();
+        scale = Math.min(20, Math.max(1, scale * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
+        if (scale === 1) { tx = 0; ty = 0; }
+        render();
+      }, { passive: false });
+      var drag = false, lx = 0, ly = 0;
+      stage.addEventListener('mousedown', function (e) { drag = true; lx = e.clientX; ly = e.clientY; stage.classList.add('grabbing'); });
+      window.addEventListener('mousemove', function (e) { if (!drag) return; tx += e.clientX - lx; ty += e.clientY - ly; lx = e.clientX; ly = e.clientY; render(); });
+      window.addEventListener('mouseup', function () { drag = false; stage.classList.remove('grabbing'); });
+      stage.addEventListener('dblclick', function () { scale = 1; tx = 0; ty = 0; render(); });
+      stage.addEventListener('keydown', function (e) {
+        var step = 30 / scale;
+        if (e.key === '+' || e.key === '=') scale = Math.min(20, scale * 1.15);
+        else if (e.key === '-') scale = Math.max(1, scale / 1.15);
+        else if (e.key === 'ArrowLeft') tx += step; else if (e.key === 'ArrowRight') tx -= step;
+        else if (e.key === 'ArrowUp') ty += step; else if (e.key === 'ArrowDown') ty -= step;
+        else if (e.key === '0') { scale = 1; tx = 0; ty = 0; }
+        else return;
+        e.preventDefault(); render();
+      });
     });
     render();
   });
@@ -223,7 +246,7 @@ def _viewer(layer: LayerDiff) -> str:
         )
     modes = [("overlay", "Overlay")]
     if has_a and has_b:
-        modes += [("swipe", "Swipe"), ("onion", "Onion")]
+        modes += [("split", "Split"), ("swipe", "Swipe"), ("onion", "Onion")]
     if has_a:
         modes.append(("a", "A (old)"))
     if has_b:
@@ -232,15 +255,24 @@ def _viewer(layer: LayerDiff) -> str:
         f'<button type="button" data-mode="{m}" aria-pressed="{"true" if m == "overlay" else "false"}">{_esc(lbl)}</button>'
         for m, lbl in modes
     )
+    # Second stage for Split: empty until the JS moves the B image into it.
+    second = (
+        '<div class="stage s2" tabindex="0" aria-label="revision B, zoomable" hidden>'
+        '<div class="pan"></div></div>'
+        if has_a and has_b
+        else ""
+    )
     return (
         '<div class="viewer">'
         f'<div class="vtoolbar">{buttons}'
         '<input class="slider" type="range" min="0" max="100" value="50" '
         'aria-label="comparison position" style="display:none">'
         '<span class="hint">scroll = zoom, drag = pan</span></div>'
+        '<div class="stages">'
         '<div class="stage" tabindex="0" aria-label="diff image, zoomable">'
         f'<div class="pan">{"".join(imgs)}</div></div>'
-        "</div>"
+        f"{second}"
+        "</div></div>"
     )
 
 

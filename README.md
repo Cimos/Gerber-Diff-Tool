@@ -8,7 +8,7 @@ overlay, in a self-contained HTML report you can attach to a review or archive.
 It runs entirely on your machine — nothing is uploaded — and the same engine
 drives a command line you can wire into CI and a small desktop GUI.
 
-> Status: **early alpha (v0.4).** Gerber **and** schematic-PDF diff both work,
+> Status: **early alpha (v0.5).** Gerber **and** schematic-PDF diff both work,
 > via a CLI (`gdiff`) and a desktop GUI (`gdiff-gui`). A reusable GitHub Action
 > is on the roadmap below.
 
@@ -34,7 +34,7 @@ native viewer ([GrbDiff](https://github.com/dennevi/GrbDiff) over `gerbv`).
 None of them are FOSS *and* cover **Gerber + schematic** in one lightweight,
 cross-platform, scriptable package. That's the gap this fills.
 
-## Features (v0.4)
+## Features (v0.5)
 
 - Compare two folders of Gerber/drill files **or** two schematic PDFs — the mode
   is auto-detected.
@@ -50,8 +50,9 @@ cross-platform, scriptable package. That's the gap this fills.
 - **Colour-blind-safe overlay**: blue = added, orange (hatched) = removed, grey =
   unchanged — meaning never relies on hue alone, and the changed region is marked.
 - Self-contained HTML report with an **interactive viewer** per changed layer
-  (side-by-side · swipe · onion-skin · overlay, with zoom/pan), lead-with-the-answer
-  table (changed-first, "only changed" filter, jump links), light/dark theme.
+  (split side-by-side with synchronized pan/zoom · swipe · onion-skin · A/B ·
+  overlay), lead-with-the-answer table (changed-first, "only changed" filter,
+  jump links), light/dark theme.
 - A desktop GUI (`gdiff-gui`) and a CLI (`gdiff`, also `python -m gerberdiff`).
 - `--fail-on-diff` exit code and a `--json` machine-readable summary for CI.
 - **Accessible**: keyboard-operable GUI (Tab + Enter, focus rings), colour-blind-safe
