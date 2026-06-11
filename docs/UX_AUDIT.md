@@ -18,6 +18,9 @@
 > into false "changed" reports (resolves the P3-era low-severity finding #9).
 > **v0.8.0**: parallel layer rendering (process pool, auto for ≥4 layers,
 > `--jobs` control) — measured 15.8 s → 6.1 s on the 18-layer reference board.
+> **v0.9.0**: native Excellon drill diffing (gerbonara parse → circle raster;
+> pygerber cannot parse Excellon, so real fab packages' .drl files previously
+> surfaced as error layers); slots are warned about, never silently dropped.
 
 ## Method
 

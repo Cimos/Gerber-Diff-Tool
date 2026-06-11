@@ -42,8 +42,13 @@ def _diff_one_layer(pair, dpmm: int, threshold: int) -> LayerDiff:
     try:
         aligned = render_aligned_pair(pair.path_a, pair.path_b, dpmm=dpmm)
         layer = diff_layer(pair, aligned.image_a, aligned.image_b, threshold=threshold, dpmm=dpmm)
+        warnings = []
         if not aligned.co_registered:
-            layer.warning = "inputs not co-registered (different extents) — diff may be offset"
+            warnings.append("inputs not co-registered (different extents) — diff may be offset")
+        if aligned.note:
+            warnings.append(aligned.note)
+        if warnings:
+            layer.warning = "; ".join(warnings)
         return layer
     except Exception as exc:  # noqa: BLE001 - one bad layer must not abort the run
         return LayerDiff(pair=pair, error=f"{type(exc).__name__}: {exc}")
