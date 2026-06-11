@@ -10,13 +10,20 @@ Launch with ``gdiff-gui`` (or ``python -m gerberdiff.gui``).
 from __future__ import annotations
 
 import datetime
+import sys
 import tempfile
 import threading
 import webbrowser
 from pathlib import Path
 
-import tkinter as tk
-from tkinter import filedialog, ttk
+try:
+    import tkinter as tk
+    from tkinter import filedialog, ttk
+
+    _TK_AVAILABLE = True
+except ModuleNotFoundError:  # tkinter isn't bundled with every Python build
+    tk = None  # type: ignore[assignment]
+    _TK_AVAILABLE = False
 
 from .runner import run_diff, write_report
 
@@ -158,6 +165,14 @@ class App:
 
 
 def main() -> int:
+    if not _TK_AVAILABLE:
+        print(
+            "gdiff-gui needs tkinter, which this Python build doesn't include.\n"
+            "Install it (e.g. 'sudo apt install python3-tk', or use the python.org\n"
+            "build) — or use the command line instead: gdiff --help",
+            file=sys.stderr,
+        )
+        return 1
     root = tk.Tk()
     App(root)
     root.mainloop()
