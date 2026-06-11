@@ -42,6 +42,14 @@ jobs:
           --add-data "branding/app.ico;branding"
           --icon branding/app.ico --noconfirm app_entry.py
 
+      - name: Self-test the portable exe
+        shell: pwsh
+        run: |
+          Start-Process -FilePath dist\GerberDiff-portable.exe -ArgumentList '--selftest','portable-selftest.txt' -Wait
+          $r = (Get-Content portable-selftest.txt -Raw).Trim()
+          Write-Host "portable selftest: $r"
+          if ($r -ne 'OK') { exit 1 }
+
       - name: Compile installer (Inno Setup)
         shell: pwsh
         run: >

@@ -27,8 +27,11 @@ report_assets/
 # Packaging scratch (the committed recipe is GerberDiff.spec / GerberDiffSetup.iss)
 /Output/
 /GDiffDebug.spec
+/GerberDiff-portable.spec
 /selftest.txt
 /dbg.txt
+/ptest.txt
+/portable-selftest.txt
 
 # OS / editor
 .DS_Store
