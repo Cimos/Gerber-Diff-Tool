@@ -364,6 +364,12 @@ def render_html(
         + _stat(str(total), subject + ("s" if total != 1 else ""))
         + (_stat(result.resolution, "resolution") if result.resolution else "")
     )
+    pairing_note = (
+        "<br><span>Note: PDF pages are paired by index — an inserted or removed page "
+        "offsets every later comparison.</span>"
+        if subject == "page"
+        else ""
+    )
     n_warn = sum(1 for lyr in result.layers if lyr.warning)
     banner = (
         f'<div class="banner">&#9888; {n_warn} {subject}(s) may not be co-registered '
@@ -391,7 +397,7 @@ def render_html(
   {banner}
   <div class="stats">{stats}</div>
   <div class="paths">A (old): <code>{_esc(result.dir_a)}</code> &nbsp;&rarr;&nbsp;
-    B (new): <code>{_esc(result.dir_b)}</code></div>
+    B (new): <code>{_esc(result.dir_b)}</code>{pairing_note}</div>
   <div class="controls">
     {filter_html}
     <div class="legend">

@@ -9,7 +9,10 @@
 > lead-with-the-answer table (changed-first + "only changed" filter + jump links),
 > live progress + empty/error states, setup memory, report a11y semantics, and
 > documentation-layer classification. **v0.5.0** adds the Split (side-by-side)
-> view with synchronized pan/zoom. **P3 remains** (GitHub Action, git-ref inputs).
+> view with synchronized pan/zoom. **v0.6.0 completes P3**: the reusable GitHub
+> Action (report artifact + step summary + create-or-update PR comment, with a
+> CI self-test job), git-ref inputs (`gdiff v1.0 HEAD --git gerbers/`), a
+> `--summary-md` output, and the PDF index-pairing expectation note.
 
 ## Method
 

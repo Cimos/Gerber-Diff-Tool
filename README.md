@@ -8,9 +8,9 @@ overlay, in a self-contained HTML report you can attach to a review or archive.
 It runs entirely on your machine — nothing is uploaded — and the same engine
 drives a command line you can wire into CI and a small desktop GUI.
 
-> Status: **early alpha (v0.5).** Gerber **and** schematic-PDF diff both work,
-> via a CLI (`gdiff`) and a desktop GUI (`gdiff-gui`). A reusable GitHub Action
-> is on the roadmap below.
+> Status: **early alpha (v0.6).** Gerber **and** schematic-PDF diff both work,
+> via a CLI (`gdiff`), a desktop GUI (`gdiff-gui`), and a reusable GitHub
+> Action that comments the diff on pull requests.
 
 ## Screenshots
 
@@ -34,7 +34,7 @@ native viewer ([GrbDiff](https://github.com/dennevi/GrbDiff) over `gerbv`).
 None of them are FOSS *and* cover **Gerber + schematic** in one lightweight,
 cross-platform, scriptable package. That's the gap this fills.
 
-## Features (v0.5)
+## Features (v0.6)
 
 - Compare two folders of Gerber/drill files **or** two schematic PDFs — the mode
   is auto-detected.
@@ -54,17 +54,19 @@ cross-platform, scriptable package. That's the gap this fills.
   overlay), lead-with-the-answer table (changed-first, "only changed" filter,
   jump links), light/dark theme.
 - A desktop GUI (`gdiff-gui`) and a CLI (`gdiff`, also `python -m gerberdiff`).
-- `--fail-on-diff` exit code and a `--json` machine-readable summary for CI.
+- `--fail-on-diff` exit code, `--json` machine-readable summary, and
+  `--summary-md` Markdown summary for CI.
+- **Git-native**: `gdiff v1.0 HEAD --git gerbers/` diffs a directory as it
+  exists at two refs (read-only, via `git archive` — no checkout juggling).
+- **GitHub Action** that uploads the HTML report and posts/updates a PR comment.
 - **Accessible**: keyboard-operable GUI (Tab + Enter, focus rings), colour-blind-safe
   diff, and a co-registration warning when two exports don't share a datum. Screen-reader
   users should use the `gdiff` CLI + `--json` (Tkinter exposes no accessibility tree).
 
 ### Roadmap
 
-- A richer in-app viewer (synchronised pan/zoom, side-by-side + overlay) — today
-  the GUI generates the report and opens it in your browser.
-- Reusable GitHub Action that comments diffs on pull requests.
 - Structural (net-level) schematic diff, beyond pixel diff.
+- Smarter PDF page pairing (by sheet title rather than index).
 
 ## Install
 
@@ -94,9 +96,49 @@ gdiff rev-old.pdf rev-new.pdf -o schematic-diff.html --dpi 200
 # Higher resolution, fail if anything changed, and emit a JSON summary (for CI)
 gdiff rev-old rev-new -o report.html --dpmm 40 --fail-on-diff --json diff.json
 
+# Diff the gerbers/ directory as it exists at two git refs (no checkout needed)
+gdiff v1.0 HEAD --git gerbers/
+
 # Or launch the desktop GUI
 gdiff-gui
 ```
+
+## GitHub Action
+
+Get a layer-by-layer diff on every pull request that touches your fab outputs.
+The action runs the diff, uploads the self-contained HTML report as an artifact,
+writes a step summary, and posts (or updates) a PR comment:
+
+```yaml
+name: gerber-diff
+on:
+  pull_request:
+    paths: ["gerbers/**"]
+
+permissions:
+  contents: read
+  pull-requests: write   # for the PR comment
+
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Materialize the base revision
+        run: |
+          git worktree add /tmp/base ${{ github.event.pull_request.base.sha }}
+      - uses: Cimos/Gerber-Diff-Tool@main
+        with:
+          old: /tmp/base/gerbers
+          new: gerbers
+          fail-on-diff: "false"   # set "true" to block merges on changes
+```
+
+Inputs: `old`, `new` (required), `dpmm`, `dpi`, `threshold`, `fail-on-diff`,
+`comment`, `report-artifact-name`. If your Gerbers are generated rather than
+committed, add your export step before the action and point `old`/`new` at the
+two output folders.
 
 The HTML report is self-contained — open it in any browser, no assets folder
 required. `--json` writes per-layer counts and an overall `any_changes` flag.

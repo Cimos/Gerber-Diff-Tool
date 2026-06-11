@@ -185,6 +185,26 @@ def test_cli_default_output_path(tmp_path: Path, monkeypatch):
     assert (tmp_path / "gerber-diff-report.html").exists()
 
 
+def test_summary_md_written(tmp_path: Path):
+    pytest.importorskip("pygerber")
+    md = tmp_path / "summary.md"
+    code = main(
+        [
+            str(FIXTURES / "revA"),
+            str(FIXTURES / "revB"),
+            "-o",
+            str(tmp_path / "r.html"),
+            "--summary-md",
+            str(md),
+            "-q",
+        ]
+    )
+    assert code == 0
+    text = md.read_text(encoding="utf-8")
+    assert "gerber-diff" in text
+    assert "Top Copper" in text
+
+
 def test_python_m_entry_runs():
     import subprocess
     import sys

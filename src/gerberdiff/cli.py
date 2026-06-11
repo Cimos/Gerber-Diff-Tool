@@ -12,6 +12,7 @@ import argparse
 import datetime
 import logging
 import sys
+import tempfile
 import warnings
 from pathlib import Path
 
@@ -29,13 +30,23 @@ def build_parser() -> argparse.ArgumentParser:
         "old",
         type=Path,
         metavar="OLD",
-        help="revision A: a folder of Gerber/drill files, or a schematic .pdf",
+        help="revision A: a folder of Gerber/drill files, a schematic .pdf, "
+        "or a git ref when --git is given",
     )
     parser.add_argument(
         "new",
         type=Path,
         metavar="NEW",
-        help="revision B: a folder of Gerber/drill files, or a schematic .pdf",
+        help="revision B: a folder of Gerber/drill files, a schematic .pdf, "
+        "or a git ref when --git is given",
+    )
+    parser.add_argument(
+        "--git",
+        metavar="SUBDIR",
+        default=None,
+        dest="git_subdir",
+        help="treat OLD and NEW as git refs and diff SUBDIR (a directory of Gerbers "
+        "inside the repo) as it exists at each ref, e.g. gdiff v1.0 HEAD --git gerbers/",
     )
     parser.add_argument(
         "-o",
@@ -51,6 +62,14 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="PATH",
         dest="json_path",
         help="also write a machine-readable JSON summary to PATH (for CI/automation)",
+    )
+    parser.add_argument(
+        "--summary-md",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        dest="summary_md",
+        help="also write a Markdown summary to PATH (for PR comments / CI step summaries)",
     )
     parser.add_argument(
         "--dpmm",
@@ -115,10 +134,26 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     try:
-        result = run_diff(
-            args.old, args.new, dpmm=args.dpmm, dpi=args.dpi, threshold=args.threshold
-        )
-    except ValueError as exc:
+        if args.git_subdir:
+            from .gitrefs import materialize_ref
+
+            # Extract both refs into a temp dir owned by this block; diffing and
+            # report rendering finish before it is cleaned up (images live in
+            # memory once run_diff returns).
+            with tempfile.TemporaryDirectory(prefix="gdiff-git-") as tmp:
+                old_dir = materialize_ref(str(args.old), args.git_subdir, Path(tmp) / "a")
+                new_dir = materialize_ref(str(args.new), args.git_subdir, Path(tmp) / "b")
+                result = run_diff(
+                    old_dir, new_dir, dpmm=args.dpmm, dpi=args.dpi, threshold=args.threshold
+                )
+            # Display the refs, not the temp paths, in reports and summaries.
+            result.dir_a = Path(f"{args.old}:{args.git_subdir}")
+            result.dir_b = Path(f"{args.new}:{args.git_subdir}")
+        else:
+            result = run_diff(
+                args.old, args.new, dpmm=args.dpmm, dpi=args.dpi, threshold=args.threshold
+            )
+    except ValueError as exc:  # includes GitRefError
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
@@ -135,6 +170,11 @@ def main(argv: list[str] | None = None) -> int:
 
         args.json_path.parent.mkdir(parents=True, exist_ok=True)
         args.json_path.write_text(render_json(result), encoding="utf-8")
+    if args.summary_md is not None:
+        from .summary import render_markdown
+
+        args.summary_md.parent.mkdir(parents=True, exist_ok=True)
+        args.summary_md.write_text(render_markdown(result), encoding="utf-8")
 
     print(
         f"Compared {len(result.layers)} {result.subject}s ({len(result.changed_layers)} changed):"

@@ -1,0 +1,101 @@
+name: "gerber-diff"
+description: >-
+  Visual diff two revisions of PCB Gerber files (or schematic PDFs). Uploads a
+  self-contained HTML report artifact, writes a step summary, and posts (or
+  updates) a PR comment with the per-layer result.
+author: "Simon Maddison"
+branding:
+  icon: "layers"
+  color: "orange"
+
+inputs:
+  old:
+    description: "Revision A: a folder of Gerber/drill files (or a .pdf)"
+    required: true
+  new:
+    description: "Revision B: a folder of Gerber/drill files (or a .pdf)"
+    required: true
+  dpmm:
+    description: "Gerber render resolution, dots per millimetre"
+    default: "20"
+  dpi:
+    description: "PDF render resolution, dots per inch"
+    default: "150"
+  threshold:
+    description: "Luminance threshold (0-255) for counting a pixel as ink"
+    default: "10"
+  fail-on-diff:
+    description: "Fail the job if anything differs (evaluated after report upload)"
+    default: "false"
+  comment:
+    description: "Post/update a PR comment with the summary (needs pull-requests: write)"
+    default: "true"
+  report-artifact-name:
+    description: "Name of the uploaded report artifact"
+    default: "gerber-diff-report"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install gerber-diff
+      shell: bash
+      run: python -m pip install --quiet "${{ github.action_path }}"
+
+    - name: Run diff
+      shell: bash
+      run: >-
+        gdiff "${{ inputs.old }}" "${{ inputs.new }}"
+        -o gerber-diff-report.html
+        --json gerber-diff.json
+        --summary-md gerber-diff-summary.md
+        --dpmm "${{ inputs.dpmm }}" --dpi "${{ inputs.dpi }}"
+        --threshold "${{ inputs.threshold }}" -q
+
+    - name: Write step summary
+      shell: bash
+      run: cat gerber-diff-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Upload report artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.report-artifact-name }}
+        path: gerber-diff-report.html
+
+    - name: Comment on PR
+      if: ${{ inputs.comment == 'true' && github.event_name == 'pull_request' }}
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const marker = '<!-- gerber-diff-action -->';
+          const summary = fs.readFileSync('gerber-diff-summary.md', 'utf8');
+          const body = summary +
+            `\n_Report: the \`${{ inputs.report-artifact-name }}\` artifact on this run._\n` + marker;
+          const {data: comments} = await github.rest.issues.listComments({
+            owner: context.repo.owner, repo: context.repo.repo,
+            issue_number: context.issue.number, per_page: 100,
+          });
+          const prev = comments.find(c => c.body && c.body.includes(marker));
+          if (prev) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner, repo: context.repo.repo,
+              comment_id: prev.id, body,
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number, body,
+            });
+          }
+
+    - name: Fail on diff
+      if: ${{ inputs.fail-on-diff == 'true' }}
+      shell: bash
+      run: >-
+        python -c "import json, sys;
+        sys.exit(1 if json.load(open('gerber-diff.json'))['any_changes'] else 0)"

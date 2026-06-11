@@ -136,6 +136,13 @@ def test_viewer_one_sided_layer_has_no_split():
     assert 'data-mode="b"' in html  # B-only view still offered
 
 
+def test_pdf_mode_shows_index_pairing_note():
+    html_pdf = render_html(_result([_layer("page-1", layer_type="Page 1")], subject="page"))
+    html_gerber = render_html(_result([_layer("f_cu")]))
+    assert "paired by index" in html_pdf
+    assert "paired by index" not in html_gerber
+
+
 def test_render_html_is_well_formed():
     from html.parser import HTMLParser
 

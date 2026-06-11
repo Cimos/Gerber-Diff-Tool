@@ -48,3 +48,15 @@ jobs:
 
       - name: Smoke-test the CLI on the fixtures
         run: uv run gdiff tests/fixtures/revA tests/fixtures/revB -o diff-report.html --json diff.json
+
+  action-self-test:
+    name: action self-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the gerber-diff action on the fixtures
+        uses: ./
+        with:
+          old: tests/fixtures/revA
+          new: tests/fixtures/revB
+          report-artifact-name: action-self-test-report
