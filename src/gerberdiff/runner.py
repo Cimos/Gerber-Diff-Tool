@@ -11,7 +11,6 @@ callback is invoked as ``progress(index, total, label)`` before each layer/page.
 from __future__ import annotations
 
 import tempfile
-import zipfile
 from collections.abc import Callable
 from contextlib import ExitStack
 from pathlib import Path
@@ -75,21 +74,30 @@ def _diff_layers_parallel(
 
 
 def _materialize(path: Path, stack: ExitStack) -> Path:
-    """Return a directory for *path*, extracting zip archives to a temp dir.
+    """Resolve *path* (folder or .zip) to the directory holding the Gerber set.
 
-    The temp dir is registered on *stack*, so it lives until the diff completes
-    (rendered images are in memory by then). A zip whose contents sit inside a
-    single top-level folder is descended into automatically.
+    Zips are extracted to a temp dir (registered on *stack*, so it lives until
+    the diff completes); the Gerber set is then located even when it's wrapped or
+    nested, and an Altium-style sibling drill folder is merged in — into a temp
+    dir, never mutating the user's input. Non-folder, non-zip paths are returned
+    unchanged for ``run_diff`` to reject. Raises ``GerberSourceError`` (a
+    ``ValueError``) when no single Gerber set can be found.
     """
-    if not is_zip(path):
+    from .discovery import extract_flat, locate_gerber_dir, merge_into_tempdir
+
+    if is_zip(path):
+        dest = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="gdiff-zip-")))
+        extract_flat(path, dest)
+        gerber_dir, drill_dir = locate_gerber_dir(dest)
+    elif path.is_dir():
+        gerber_dir, drill_dir = locate_gerber_dir(path)
+    else:
         return path
-    dest = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="gdiff-zip-")))
-    with zipfile.ZipFile(path) as archive:
-        archive.extractall(dest)  # extract() sanitises absolute/illegal member paths
-    entries = list(dest.iterdir())
-    if len(entries) == 1 and entries[0].is_dir():
-        return entries[0]
-    return dest
+
+    if drill_dir is not None:
+        merged = Path(stack.enter_context(tempfile.TemporaryDirectory(prefix="gdiff-merge-")))
+        return merge_into_tempdir(gerber_dir, drill_dir, merged)
+    return gerber_dir
 
 
 def run_diff(

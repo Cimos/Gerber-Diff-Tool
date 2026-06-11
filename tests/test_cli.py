@@ -104,6 +104,8 @@ def test_mismatched_inputs_exit_2(tmp_path: Path, capsys):
     pdf.write_bytes(b"%PDF-1.4")
     folder = tmp_path / "d"
     folder.mkdir()
+    for name in ("a.gtl", "a.gbl", "a.gto"):  # a real Gerber folder vs a PDF = type mismatch
+        (folder / name).write_text("G04*\nM02*\n")
     code = main([str(folder), str(pdf), "-o", str(tmp_path / "r.html")])
     assert code == 2
     assert "both" in capsys.readouterr().err
