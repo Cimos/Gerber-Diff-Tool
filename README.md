@@ -219,6 +219,11 @@ gerber-diff is free and MIT-licensed. If it saved you from a bad board respin
 and you'd like to say thanks, you can
 [buy me a coffee](https://www.buymeacoffee.com/cimos).
 
+Found a bug or have an idea?
+[Open an issue](https://github.com/Cimos/Gerber-Diff-Tool/issues/new/choose) — the
+bug-report form asks for the few details (version, OS, what you compared) that make
+it fixable on the first pass.
+
 ## License
 
 [MIT](LICENSE) © 2026 Simon Maddison

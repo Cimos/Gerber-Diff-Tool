@@ -1,0 +1,72 @@
+name: Bug report
+description: Something went wrong — a crash, a wrong diff, a layer that didn't load.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for trying gerber-diff! A few details make a bug fixable on the first pass.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: From the app title bar (`gerber-diff X.Y.Z`) or `gdiff --version`.
+      placeholder: "0.10.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How are you running it?
+      options:
+        - Installer (GerberDiffSetup.exe)
+        - Portable (GerberDiff-portable.exe)
+        - pip / from source
+        - GitHub Action
+    validations:
+      required: true
+  - type: dropdown
+    id: input
+    attributes:
+      label: What did you compare?
+      options:
+        - Gerber folder(s)
+        - Gerber zip(s) / fab package
+        - Schematic PDFs
+        - Two git refs (--git)
+        - Other / not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what did you get instead?
+      placeholder: I opened two fab zips, hit Compare, and the top copper layer showed as all-removed.
+    validations:
+      required: true
+  - type: textarea
+    id: selftest
+    attributes:
+      label: Self-test output (packaging / launch issues only)
+      description: If the app won't start or render, paste the output of `GerberDiff.exe --selftest`.
+      render: text
+    validations:
+      required: false
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshots, the HTML report, or sample files
+      description: Drag in a screenshot, the generated report, or (if shareable) the Gerbers that reproduce it.
+    validations:
+      required: false

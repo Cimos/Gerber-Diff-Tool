@@ -1,0 +1,32 @@
+name: Feature request / improvement
+description: Suggest an improvement to the viewer, the diff, or the workflow.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the problem or friction?
+      description: What were you trying to do, and where did the tool get in the way?
+      placeholder: When reviewing a 12-layer board I lose track of which layer I'm on.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would help?
+      description: Your idea for a fix or feature — rough is fine.
+    validations:
+      required: false
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part?
+      options:
+        - Desktop viewer (gdiff-gui)
+        - HTML report
+        - CLI (gdiff)
+        - Input handling (folders / zips / packs)
+        - GitHub Action
+        - Other
+    validations:
+      required: false
