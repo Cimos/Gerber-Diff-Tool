@@ -121,7 +121,10 @@ def _gerbonara_graphic_map(folder: Path) -> dict[str, Path]:
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            stack = LayerStack.open(str(folder))
+            # lazy=True skips a full parse of every file (we only read each
+            # layer's original_path below); the default eagerly parses both
+            # directories serially before any rendering starts.
+            stack = LayerStack.open(str(folder), lazy=True)
     except Exception:
         return {}
 

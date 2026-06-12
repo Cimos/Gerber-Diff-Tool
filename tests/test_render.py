@@ -13,11 +13,40 @@ from PIL import Image  # noqa: E402
 from gerberdiff.render import (  # noqa: E402
     Rendered,
     _compose_on,
+    effective_dpmm,
+    render_aligned_pair,
     render_gerber,
     render_pair_aligned,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def test_effective_dpmm_small_board_uncapped():
+    # 50x40 mm at 20 dpmm = 0.8 MP — far below any cap.
+    assert effective_dpmm((0, 0, 50, 40), 20, 16_000_000) == 20
+
+
+def test_effective_dpmm_caps_huge_board():
+    # 400x300 mm at 20 dpmm would be 48 MP; the 16 MP cap lowers the dpmm.
+    eff = effective_dpmm((0, 0, 400, 300), 20, 16_000_000)
+    assert 1 <= eff < 20
+    assert (400 * eff) * (300 * eff) <= 16_000_000
+
+
+def test_effective_dpmm_zero_disables_cap():
+    assert effective_dpmm((0, 0, 400, 300), 20, 0) == 20
+
+
+def test_render_aligned_pair_notes_when_capped():
+    pair = render_aligned_pair(
+        FIXTURES / "revA" / "fixture-F_Cu.gbr",
+        FIXTURES / "revB" / "fixture-F_Cu.gbr",
+        dpmm=20,
+        max_pixels=100,  # absurdly small cap to force the note on a tiny fixture
+    )
+    assert pair.note is not None and "capped" in pair.note
+    assert pair.image_a.width < 20  # rendered at the lowered dpmm
 
 
 def test_render_gerber_returns_rgba_and_correct_bbox():

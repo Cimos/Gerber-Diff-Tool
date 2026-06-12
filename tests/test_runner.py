@@ -140,14 +140,34 @@ def test_parallel_matches_serial(tmp_path: Path):
     ]
 
 
+def test_byte_identical_layers_skip_rendering(tmp_path: Path):
+    """Identical files short-circuit: no render, no overlay — just 'unchanged'."""
+    a = tmp_path / "a"
+    b = tmp_path / "b"
+    a.mkdir()
+    b.mkdir()
+    src = (FIXTURES / "revA" / "fixture-F_Cu.gbr").read_text()
+    for d in (a, b):
+        (d / "brd-F_Cu.gbr").write_text(src)
+        (d / "brd-B_Cu.gbr").write_text(src)
+    # No pygerber importorskip on purpose: identical inputs must complete
+    # without any renderer being touched.
+    result = run_diff(a, b, dpmm=20)
+    assert len(result.layers) == 2
+    assert not result.any_changes
+    assert all(lyr.overlay_png is None for lyr in result.layers)  # render skipped
+
+
 def test_run_diff_bad_gerber_becomes_error_layer(tmp_path: Path):
     pytest.importorskip("pygerber")
     a = tmp_path / "a"
     b = tmp_path / "b"
     a.mkdir()
     b.mkdir()
+    # The two sides must differ: byte-identical files short-circuit to
+    # "unchanged" without ever invoking the renderer (so no error either).
     (a / "junk.gbr").write_text("this is not a gerber file")
-    (b / "junk.gbr").write_text("this is not a gerber file")
+    (b / "junk.gbr").write_text("this is not a gerber file, and a different one")
     result = run_diff(a, b, dpmm=20)
     assert len(result.layers) == 1
     assert result.layers[0].error is not None

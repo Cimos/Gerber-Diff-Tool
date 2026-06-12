@@ -129,6 +129,20 @@ def test_png_bytes_has_png_signature():
     assert png_bytes(Image.new("RGB", (2, 2)))[:8] == b"\x89PNG\r\n\x1a\n"
 
 
+def test_png_bytes_palette_roundtrips_exact_colours():
+    # The overlay holds <=7 flat colours; the palette encode must preserve them
+    # exactly (lossless quantisation), not approximate them.
+    import io as _io
+
+    added = np.zeros((4, 8), dtype=bool)
+    removed = np.zeros((4, 8), dtype=bool)
+    common = np.zeros((4, 8), dtype=bool)
+    added[0, 0] = removed[1, 1] = common[2, 2] = True
+    overlay = overlay_image(added, removed, common)
+    decoded = Image.open(_io.BytesIO(png_bytes(overlay, palette=True))).convert("RGB")
+    assert np.array_equal(np.asarray(decoded), np.asarray(overlay))
+
+
 def test_overlay_background_is_filled():
     from gerberdiff.diff import COLOR_BACKGROUND
 

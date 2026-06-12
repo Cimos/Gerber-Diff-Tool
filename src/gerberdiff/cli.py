@@ -97,6 +97,15 @@ def build_parser() -> argparse.ArgumentParser:
         "(default: %(default)s)",
     )
     parser.add_argument(
+        "--max-pixels",
+        type=int,
+        default=None,
+        metavar="N",
+        dest="max_pixels",
+        help="cap each rendered layer at N pixels, lowering dpmm for very large "
+        "boards (default: 16000000; 0 = uncapped)",
+    )
+    parser.add_argument(
         "--fail-on-diff",
         action="store_true",
         help="exit with code 1 if anything differs (useful in CI)",
@@ -157,6 +166,7 @@ def main(argv: list[str] | None = None) -> int:
                     dpi=args.dpi,
                     threshold=args.threshold,
                     jobs=args.jobs,
+                    max_pixels=args.max_pixels,
                 )
             # Display the refs, not the temp paths, in reports and summaries.
             result.dir_a = Path(f"{args.old}:{args.git_subdir}")
@@ -169,6 +179,7 @@ def main(argv: list[str] | None = None) -> int:
                 dpi=args.dpi,
                 threshold=args.threshold,
                 jobs=args.jobs,
+                max_pixels=args.max_pixels,
             )
     except ValueError as exc:  # includes GitRefError
         print(f"error: {exc}", file=sys.stderr)

@@ -16,10 +16,26 @@ from contextlib import ExitStack
 from pathlib import Path
 
 from .diff import diff_layer
-from .models import DiffResult, LayerDiff
+from .models import DiffResult, LayerDiff, PairStatus
 from .pairing import pair_layers
 
 ProgressFn = Callable[[int, int, str], None]
+
+
+def _files_identical(a: Path, b: Path) -> bool:
+    """True when both files hold exactly the same bytes (size check first)."""
+    try:
+        if a.stat().st_size != b.stat().st_size:
+            return False
+        with a.open("rb") as fa, b.open("rb") as fb:
+            while True:
+                chunk_a = fa.read(1 << 20)
+                if chunk_a != fb.read(1 << 20):
+                    return False
+                if not chunk_a:
+                    return True
+    except OSError:
+        return False
 
 
 def is_pdf(path: Path) -> bool:
@@ -30,7 +46,7 @@ def is_zip(path: Path) -> bool:
     return path.is_file() and path.suffix.lower() == ".zip"
 
 
-def _diff_one_layer(pair, dpmm: int, threshold: int) -> LayerDiff:
+def _diff_one_layer(pair, dpmm: int, threshold: int, max_pixels: int | None = None) -> LayerDiff:
     """Render + diff a single layer pair; errors become error-layers.
 
     Module-level and picklable so it runs identically in the serial loop and in
@@ -38,8 +54,20 @@ def _diff_one_layer(pair, dpmm: int, threshold: int) -> LayerDiff:
     """
     from .render import render_aligned_pair
 
+    if (
+        pair.status is PairStatus.MATCHED
+        and pair.path_a is not None
+        and pair.path_b is not None
+        and _files_identical(pair.path_a, pair.path_b)
+    ):
+        # Byte-identical files cannot differ — skip parse/raster/encode entirely.
+        # Between two real revisions most layers are untouched, so this is the
+        # difference between seconds and minutes on a large board.
+        return LayerDiff(pair=pair)
+
     try:
-        aligned = render_aligned_pair(pair.path_a, pair.path_b, dpmm=dpmm)
+        kwargs = {} if max_pixels is None else {"max_pixels": max_pixels}
+        aligned = render_aligned_pair(pair.path_a, pair.path_b, dpmm=dpmm, **kwargs)
         layer = diff_layer(pair, aligned.image_a, aligned.image_b, threshold=threshold, dpmm=dpmm)
         warnings = []
         if not aligned.co_registered:
@@ -54,7 +82,12 @@ def _diff_one_layer(pair, dpmm: int, threshold: int) -> LayerDiff:
 
 
 def _diff_layers_parallel(
-    pairs: list, dpmm: int, threshold: int, jobs: int, progress: ProgressFn | None
+    pairs: list,
+    dpmm: int,
+    threshold: int,
+    jobs: int,
+    progress: ProgressFn | None,
+    max_pixels: int | None = None,
 ) -> list[LayerDiff]:
     """Fan the per-layer work across processes; results keep input order."""
     from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -62,7 +95,7 @@ def _diff_layers_parallel(
     results: list[LayerDiff | None] = [None] * len(pairs)
     with ProcessPoolExecutor(max_workers=min(jobs, len(pairs), 8)) as pool:
         futures = {
-            pool.submit(_diff_one_layer, pair, dpmm, threshold): index
+            pool.submit(_diff_one_layer, pair, dpmm, threshold, max_pixels): index
             for index, pair in enumerate(pairs)
         }
         for done, future in enumerate(as_completed(futures)):
@@ -109,12 +142,14 @@ def run_diff(
     threshold: int = 10,
     jobs: int = 0,
     progress: ProgressFn | None = None,
+    max_pixels: int | None = None,
 ) -> DiffResult:
     """Diff two inputs, auto-detecting Gerber-folder / zip / PDF mode.
 
     ``jobs`` controls gerber-layer parallelism: 0 = auto (CPU count), 1 = serial.
-    Raises ``ValueError`` if the inputs aren't two Gerber sources (folder or
-    zip, mixable) or two PDFs.
+    ``max_pixels`` caps each rendered layer's pixel count (None = engine default,
+    0 = uncapped). Raises ``ValueError`` if the inputs aren't two Gerber sources
+    (folder or zip, mixable) or two PDFs.
     """
     old = Path(old)
     new = Path(new)
@@ -139,7 +174,9 @@ def run_diff(
             layers: list[LayerDiff] | None = None
             if resolved_jobs > 1 and len(pairs) >= 4:
                 try:
-                    layers = _diff_layers_parallel(pairs, dpmm, threshold, resolved_jobs, progress)
+                    layers = _diff_layers_parallel(
+                        pairs, dpmm, threshold, resolved_jobs, progress, max_pixels
+                    )
                 except (OSError, RuntimeError):  # pool unavailable -> serial fallback
                     layers = None
             if layers is None:
@@ -147,7 +184,7 @@ def run_diff(
                 for index, pair in enumerate(pairs):
                     if progress is not None:
                         progress(index, len(pairs), pair.layer_type)
-                    layers.append(_diff_one_layer(pair, dpmm, threshold))
+                    layers.append(_diff_one_layer(pair, dpmm, threshold, max_pixels))
             # Reports show the inputs as given (the zip path, not the temp dir).
             return DiffResult(
                 dir_a=old, dir_b=new, resolution=f"{dpmm} dpmm", subject="layer", layers=layers

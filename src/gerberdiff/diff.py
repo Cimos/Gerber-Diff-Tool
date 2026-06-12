@@ -68,9 +68,12 @@ def overlay_image(added: np.ndarray, removed: np.ndarray, common: np.ndarray) ->
     rgb[common] = COLOR_COMMON
     rgb[added] = COLOR_ADDED
     rgb[removed] = COLOR_REMOVED
-    yy, xx = np.indices((height, width))
-    hatch = ((xx + yy) % 8) < 3  # diagonal bands
-    rgb[removed & hatch] = COLOR_REMOVED_HATCH
+    # Hatch only the removed pixels' coordinates: np.indices over the full frame
+    # allocates ~640 MB of int64 transients on a 20 MP layer for the same bands.
+    ys, xs = np.nonzero(removed)
+    if ys.size:
+        sel = ((xs + ys) % 8) < 3  # diagonal bands
+        rgb[ys[sel], xs[sel]] = COLOR_REMOVED_HATCH
     return Image.fromarray(rgb, mode="RGB")
 
 
@@ -85,11 +88,15 @@ def bbox_of(mask: np.ndarray) -> tuple[int, int, int, int] | None:
     return (int(x0), int(y0), int(x1), int(y1))
 
 
-def png_bytes(image: Image.Image) -> bytes:
+def png_bytes(image: Image.Image, *, palette: bool = False) -> bytes:
+    """Encode a PNG without ``optimize=True`` (measured ~10x slower on 20 MP
+    layers for a few percent of size). ``palette=True`` quantises the overlay —
+    it holds at most 7 flat colours — which is both faster to encode and
+    substantially smaller than RGB."""
     buffer = io.BytesIO()
-    # optimize=True shrinks the flat-colour overlays noticeably; reports embed
-    # several of these as base64, so it directly cuts report size.
-    image.save(buffer, format="PNG", optimize=True)
+    if palette:
+        image = image.convert("P", palette=Image.Palette.ADAPTIVE, colors=8)
+    image.save(buffer, format="PNG", compress_level=6)
     return buffer.getvalue()
 
 
@@ -151,7 +158,7 @@ def diff_layer(
         added_pixels=int(added.sum()),
         removed_pixels=int(removed.sum()),
         common_pixels=int(common.sum()),
-        overlay_png=png_bytes(overlay),
+        overlay_png=png_bytes(overlay, palette=True),
         changed_bbox=changed_bbox,
         changed_size_mm=changed_size_mm,
     )
