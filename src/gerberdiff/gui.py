@@ -472,10 +472,14 @@ def _selftest(report_path: str | None = None) -> int:
             a, b = _Path(td) / "a", _Path(td) / "b"
             a.mkdir()
             b.mkdir()
+            # 4+ layers on purpose: runner only goes parallel at >=4 pairs, and the
+            # parallel path is exactly what breaks in a frozen build that lacks
+            # multiprocessing.freeze_support() (each worker re-runs the GUI entry).
             for d in (a, b):
-                (d / "x-F_Cu.gbr").write_text(gerber)
-                (d / "x-B_Cu.gbr").write_text(gerber)
-            assert run_diff(a, b, dpmm=10).layers, "gerber path produced no layers"
+                for name in ("x-F_Cu.gbr", "x-B_Cu.gbr", "x-F_Mask.gbr", "x-B_Mask.gbr"):
+                    (d / name).write_text(gerber)
+            result = run_diff(a, b, dpmm=10)
+            assert len(result.layers) >= 4, "gerber path produced too few layers"
 
             from PIL import Image, ImageDraw
 
