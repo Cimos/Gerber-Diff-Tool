@@ -211,7 +211,8 @@ dist\GerberDiff\GerberDiff.exe --selftest        # prints OK if the bundle is in
 
 Pushing a `v*` tag triggers `.github/workflows/release.yml`, which builds the
 one-folder app, compiles the Inno Setup installer (`GerberDiffSetup.iss`) and a
-portable one-file exe, and attaches both to a GitHub Release.
+portable one-file exe, and attaches both to a GitHub Release. Release history
+lives in [CHANGELOG.md](CHANGELOG.md).
 
 ## Support
 
